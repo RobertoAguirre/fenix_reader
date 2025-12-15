@@ -1,0 +1,52 @@
+name: fenix_reader
+description: "Fenix Reader - App de meditación y contenido"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # Networking
+  http: ^1.1.0
+  
+  # Storage
+  flutter_secure_storage: ^9.0.0
+  
+  # Video
+  video_player: ^2.8.0
+  chewie: ^1.7.0
+  
+  # Audio
+  audioplayers: ^5.2.0
+  audio_service: ^0.18.12
+  just_audio: ^0.9.36
+  
+  # Images
+  cached_network_image: ^3.3.0
+  
+  # UI
+  shimmer: ^3.0.0
+  google_fonts: ^6.1.0
+  
+  # State Management
+  provider: ^6.1.0
+  
+  # Navigation
+  go_router: ^12.0.0
+  
+  # Utils
+  url_launcher: ^6.2.0
+  connectivity_plus: ^5.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
