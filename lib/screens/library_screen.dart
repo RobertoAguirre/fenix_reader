@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/content_provider.dart';
+import '../services/wordpress_service.dart';
 
 /// Pantalla de Biblioteca
 class LibraryScreen extends StatefulWidget {
@@ -13,16 +16,9 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   int _selectedTab = 0;
   final _tabs = [AppConstants.myContent, AppConstants.favorites];
-
-  // Datos de ejemplo
-  final _items = [
-    {'title': 'Fortalecer Relación de Pareja', 'favorite': false},
-    {'title': 'Hipnosis - Depresión', 'favorite': false},
-    {'title': 'Hipnosis - Libre de Azúcar', 'favorite': false},
-    {'title': 'Hipnosis - Tiroides', 'favorite': false},
-    {'title': 'Fortalecer Relación de Pareja', 'favorite': false},
-    {'title': 'Hipnosis - Depresión', 'favorite': false},
-  ];
+  
+  // IDs de favoritos (local por ahora)
+  final Set<int> _favoriteIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -30,12 +26,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       backgroundColor: AppColors.origen,
       body: Column(
         children: [
-          // Header marrón
           _buildHeader(),
-          // Tabs
           _buildTabs(),
           const SizedBox(height: 8),
-          // Lista de contenido
           Expanded(
             child: _buildList(),
           ),
@@ -103,54 +96,94 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Widget _buildList() {
-    final displayItems = _selectedTab == 1
-        ? _items.where((item) => item['favorite'] == true).toList()
-        : _items;
+    return Consumer<ContentProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(color: AppColors.ascenso),
+          );
+        }
 
-    if (displayItems.isEmpty && _selectedTab == 1) {
-      return Center(
-        child: Text(
-          'No tienes favoritas aún',
-          style: AppTypography.ralewayRegular(
-            fontSize: 14,
-            color: AppColors.raizSagrada.withValues(alpha: 0.5),
-          ),
-        ),
-      );
-    }
+        final allItems = provider.all;
+        
+        // Filtrar según pestaña
+        final displayItems = _selectedTab == 1
+            ? allItems.where((item) => _favoriteIds.contains(item.id)).toList()
+            : allItems;
 
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: displayItems.length,
-      itemBuilder: (context, index) {
-        final item = displayItems[index];
-        return _LibraryListItem(
-          title: item['title'] as String,
-          isFavorite: item['favorite'] as bool,
-          onTap: () {
-            // TODO: Navegar al contenido
-          },
-          onFavoriteTap: () {
-            setState(() {
-              final originalIndex = _items.indexOf(item);
-              _items[originalIndex]['favorite'] = !(item['favorite'] as bool);
-            });
+        if (displayItems.isEmpty) {
+          return _buildEmptyState();
+        }
+
+        return ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: displayItems.length,
+          itemBuilder: (context, index) {
+            final item = displayItems[index];
+            final isFavorite = _favoriteIds.contains(item.id);
+            
+            return _LibraryListItem(
+              title: item.title,
+              subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
+              isFavorite: isFavorite,
+              onTap: () {
+                debugPrint('Reproducir: ${item.title}');
+              },
+              onFavoriteTap: () {
+                setState(() {
+                  if (isFavorite) {
+                    _favoriteIds.remove(item.id);
+                  } else {
+                    _favoriteIds.add(item.id);
+                  }
+                });
+              },
+            );
           },
         );
       },
     );
   }
+
+  Widget _buildEmptyState() {
+    final message = _selectedTab == 1
+        ? 'No tienes favoritos aún'
+        : 'Tu biblioteca está vacía';
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _selectedTab == 1 ? Icons.favorite_border : Icons.folder_open_outlined,
+            size: 64,
+            color: AppColors.raizSagrada.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: AppTypography.ralewayRegular(
+              fontSize: 15,
+              color: AppColors.raizSagrada.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// Item de lista para biblioteca con corazón verde oliva cuadrado
+/// Item de lista para biblioteca
 class _LibraryListItem extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onFavoriteTap;
 
   const _LibraryListItem({
     required this.title,
+    this.subtitle,
     this.isFavorite = false,
     this.onTap,
     this.onFavoriteTap,
@@ -189,16 +222,32 @@ class _LibraryListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            // Título
+            // Título y subtítulo
             Expanded(
-              child: Text(
-                title,
-                style: AppTypography.ralewayRegular(fontSize: 15),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.ralewayRegular(fontSize: 15),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTypography.ralewayLight(
+                        fontSize: 12,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            // Corazón verde oliva cuadrado redondeado
+            // Corazón verde oliva
             GestureDetector(
               onTap: onFavoriteTap,
               child: Container(

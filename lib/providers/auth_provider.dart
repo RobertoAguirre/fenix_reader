@@ -3,21 +3,61 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 
 /// Provider de autenticación
-/// TODO: Implementar lógica cuando auth_service esté listo
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
 
   User? get user => _authService.currentUser;
   bool get isAuthenticated => _authService.isAuthenticated;
+  
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+  
+  String? _error;
+  String? get error => _error;
 
-  Future<void> login(String email, String password) async {
-    // TODO: Implementar
+  /// Inicializar - verificar sesión guardada
+  Future<bool> init() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final hasSession = await _authService.checkSession();
+
+    _isLoading = false;
+    notifyListeners();
+
+    return hasSession;
   }
 
+  /// Login
+  Future<bool> login(String email, String password) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.login(email, password);
+
+    _isLoading = false;
+    
+    if (result.success) {
+      _error = null;
+    } else {
+      _error = result.error;
+    }
+    
+    notifyListeners();
+    return result.success;
+  }
+
+  /// Logout
   Future<void> logout() async {
-    // TODO: Implementar
+    await _authService.logout();
+    _error = null;
+    notifyListeners();
+  }
+
+  /// Limpiar error
+  void clearError() {
+    _error = null;
+    notifyListeners();
   }
 }
-

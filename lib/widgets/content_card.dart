@@ -5,6 +5,7 @@ import '../config/theme.dart';
 /// Card de contenido para listas (biblioteca)
 class ContentListItem extends StatelessWidget {
   final String title;
+  final String? subtitle;
   final String? imageUrl;
   final bool isFavorite;
   final VoidCallback? onTap;
@@ -13,6 +14,7 @@ class ContentListItem extends StatelessWidget {
   const ContentListItem({
     super.key,
     required this.title,
+    this.subtitle,
     this.imageUrl,
     this.isFavorite = false,
     this.onTap,
@@ -52,13 +54,29 @@ class ContentListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            // Título
+            // Título y subtítulo
             Expanded(
-              child: Text(
-                title,
-                style: AppTypography.ralewayRegular(fontSize: 15),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.ralewayRegular(fontSize: 15),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: AppTypography.ralewayLight(
+                        fontSize: 12,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             // Favorito

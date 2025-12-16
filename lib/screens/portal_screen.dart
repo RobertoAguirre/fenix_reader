@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
-import '../widgets/fenix_tab_bar.dart';
+import '../providers/content_provider.dart';
+import '../services/wordpress_service.dart';
 import '../widgets/content_card.dart';
 
 /// Pantalla de Portales/Inicio con tabs
@@ -26,9 +28,7 @@ class _PortalScreenState extends State<PortalScreen> {
       backgroundColor: AppColors.origen,
       body: Column(
         children: [
-          // Header marrón
           _buildHeader(),
-          // Contenido
           Expanded(
             child: _buildContent(),
           ),
@@ -81,60 +81,67 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   Widget _buildContent() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-          // Tabs
-          _buildTabs(),
-          const SizedBox(height: 20),
-          // Sección Fénix alquimista
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Fénix alquimista',
-              style: AppTypography.kaushanTitle(
-                fontSize: 24,
-                color: AppColors.raizSagrada,
+    return Consumer<ContentProvider>(
+      builder: (context, provider, _) {
+        // Filtrar contenido según pestaña
+        final items = _getFilteredItems(provider);
+
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              _buildTabs(),
+              const SizedBox(height: 20),
+              // Título de sección
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Fénix alquimista',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 24,
+                    color: AppColors.expansionAlquimica,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Recursos para tu camino de transformación',
-              style: AppTypography.ralewayRegular(
-                fontSize: 13,
-                color: AppColors.raizSagrada.withValues(alpha: 0.7),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  'Recursos para tu camino de transformación',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 13,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+              // Mostrar contenido o estado vacío
+              if (provider.isLoading)
+                _buildLoading()
+              else if (items.isEmpty)
+                _buildEmptyState()
+              else
+                _buildContentList(items),
+              const SizedBox(height: 20),
+            ],
           ),
-          const SizedBox(height: 16),
-          // Card destacado grande
-          _buildFeatureCard(),
-          const SizedBox(height: 24),
-          // Lista de contenido
-          ContentListItem(
-            title: 'Hipnosis - Depresión',
-            onTap: () {},
-            onFavoriteTap: () {},
-          ),
-          ContentListItem(
-            title: 'Hipnosis - Libre de Azúcar',
-            onTap: () {},
-            onFavoriteTap: () {},
-          ),
-          ContentListItem(
-            title: 'Hipnosis - Tiroides',
-            onTap: () {},
-            onFavoriteTap: () {},
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
+        );
+      },
     );
+  }
+
+  List<ContentItem> _getFilteredItems(ContentProvider provider) {
+    switch (_selectedTab) {
+      case 0: // INICIO - Todo
+        return provider.all;
+      case 1: // HIPNOSIS
+        return provider.hypnosis;
+      case 2: // MEDITACIONES
+        return provider.meditations;
+      default:
+        return provider.all;
+    }
   }
 
   Widget _buildTabs() {
@@ -172,7 +179,76 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  Widget _buildFeatureCard() {
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.all(40),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: AppColors.ascenso,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    String message;
+    switch (_selectedTab) {
+      case 1:
+        message = 'No tienes hipnosis en tu biblioteca';
+        break;
+      case 2:
+        message = 'No tienes meditaciones en tu biblioteca';
+        break;
+      default:
+        message = 'Tu biblioteca está vacía';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              Icons.folder_open_outlined,
+              size: 64,
+              color: AppColors.raizSagrada.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              style: AppTypography.ralewayRegular(
+                fontSize: 15,
+                color: AppColors.raizSagrada.withValues(alpha: 0.6),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentList(List<ContentItem> items) {
+    // Mostrar primer item como destacado si hay contenido
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        // Card destacado con el primer item
+        _buildFeatureCard(items.first),
+        const SizedBox(height: 24),
+        // Lista del resto
+        ...items.skip(1).map((item) => ContentListItem(
+          title: item.title,
+          subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
+          onTap: () => _onItemTap(item),
+          onFavoriteTap: () {},
+        )),
+      ],
+    );
+  }
+
+  Widget _buildFeatureCard(ContentItem item) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -216,7 +292,7 @@ class _PortalScreenState extends State<PortalScreen> {
                     ),
                   ),
                   Text(
-                    'Mensajes del universo',
+                    item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
                     style: AppTypography.kaushanTitle(
                       fontSize: 22,
                       color: AppColors.raizSagrada,
@@ -241,53 +317,56 @@ class _PortalScreenState extends State<PortalScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Mensajes del universo',
+                  item.title,
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
-                  style: AppTypography.ralewayRegular(
-                    fontSize: 13,
-                    color: AppColors.raizSagrada.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Botón Leer ahora
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.ascenso,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.menu_book_outlined,
-                            color: AppColors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Leer ahora',
-                            style: AppTypography.ralewayBold(
-                              fontSize: 12,
-                              color: AppColors.white,
-                            ),
-                          ),
-                        ],
-                      ),
+                if (item.description != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    item.description!,
+                    style: AppTypography.ralewayRegular(
+                      fontSize: 13,
+                      color: AppColors.raizSagrada.withValues(alpha: 0.7),
                     ),
-                  ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                // Botón reproducir
+                GestureDetector(
+                  onTap: () => _onItemTap(item),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.ascenso,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.play_circle_outline,
+                          color: AppColors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Reproducir',
+                          style: AppTypography.ralewayBold(
+                            fontSize: 12,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -295,5 +374,10 @@ class _PortalScreenState extends State<PortalScreen> {
         ],
       ),
     );
+  }
+
+  void _onItemTap(ContentItem item) {
+    // TODO: Navegar a reproductor
+    debugPrint('Reproducir: ${item.title}');
   }
 }

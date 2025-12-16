@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
+import '../providers/content_provider.dart';
 import '../widgets/fenix_logo.dart';
 import '../widgets/fenix_bottom_nav.dart';
 
@@ -18,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  String? _errorMessage;
   int _navIndex = 2; // Perfil seleccionado por defecto en login
 
   @override
@@ -28,13 +32,36 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() async {
-    setState(() => _isLoading = true);
-    
-    // TODO: Implementar lógica de login con AuthService
-    await Future.delayed(const Duration(seconds: 1));
-    
-    setState(() => _isLoading = false);
-    widget.onLoginSuccess?.call();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Ingresa tu correo y contraseña');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.login(email, password);
+
+    if (success) {
+      // Cargar contenido del usuario en el provider
+      if (mounted) {
+        await context.read<ContentProvider>().loadUserContent(email);
+      }
+      
+      setState(() => _isLoading = false);
+      widget.onLoginSuccess?.call();
+    } else {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = authProvider.error ?? 'Error al iniciar sesión';
+      });
+    }
   }
 
   @override
@@ -169,6 +196,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Text(AppConstants.access),
                 ),
               ),
+              // Mensaje de error
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _errorMessage!,
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 13,
+                    color: AppColors.error,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
               const SizedBox(height: 20),
               // Link registro
               Row(
