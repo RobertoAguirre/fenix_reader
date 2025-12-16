@@ -53,7 +53,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       bottomNavigationBar: FenixBottomNav(
         currentIndex: _navIndex,
-        onTap: (index) => setState(() => _navIndex = index),
+        onTap: (index) {
+          // Al tocar cualquier nav, entrar a la app
+          widget.onLoginSuccess?.call();
+        },
       ),
     );
   }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 
-/// Pantalla de Perfil
+/// Pantalla de Perfil/Menú
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -10,181 +11,114 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.origen,
-      body: Column(
-        children: [
-          // Header
-          _buildHeader(context),
-          // Contenido
-          Expanded(
-            child: _buildContent(context),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 16,
-        left: 20,
-        right: 20,
-        bottom: 30,
-      ),
-      decoration: const BoxDecoration(
-        color: AppColors.raizSagrada,
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Builder(
-                builder: (context) => GestureDetector(
-                  onTap: () => Scaffold.of(context).openDrawer(),
-                  child: const Icon(
-                    Icons.menu,
-                    color: AppColors.white,
-                    size: 24,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 30),
+                // Saludo
+                Text(
+                  'Bienvenida a tu espacio fénix.',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 20,
+                    color: AppColors.expansionAlquimica,
                   ),
                 ),
-              ),
-              const Spacer(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Avatar placeholder
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: AppColors.ascenso.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.ascenso, width: 2),
-            ),
-            child: const Icon(
-              Icons.person,
-              size: 40,
-              color: AppColors.white,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Mi Perfil',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContent(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _ProfileOption(
-          icon: Icons.person_outline,
-          title: 'Datos personales',
-          onTap: () {},
-        ),
-        _ProfileOption(
-          icon: Icons.lock_outline,
-          title: 'Cambiar contraseña',
-          onTap: () {},
-        ),
-        _ProfileOption(
-          icon: Icons.notifications_none,
-          title: 'Notificaciones',
-          onTap: () {},
-        ),
-        _ProfileOption(
-          icon: Icons.help_outline,
-          title: 'Ayuda',
-          onTap: () {},
-        ),
-        const SizedBox(height: 30),
-        // Logo y firma
-        Center(
-          child: Column(
-            children: [
-              const FenixLogo(size: 60),
-              const SizedBox(height: 8),
-              Text(
-                'Wendy Staufert',
-                style: AppTypography.kaushanTitle(
-                  fontSize: 18,
-                  color: AppColors.expansionAlquimica,
+                const SizedBox(height: 40),
+                // Logo centrado
+                Center(
+                  child: Column(
+                    children: [
+                      const FenixLogo(
+                        size: 120,
+                        color: AppColors.raizSagrada,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Wendy Staufert',
+                        style: AppTypography.kaushanTitle(
+                          fontSize: 22,
+                          color: AppColors.raizSagrada,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 30),
-        // Cerrar sesión
-        Center(
-          child: TextButton(
-            onPressed: () {
-              // TODO: Implementar logout
-            },
-            child: Text(
-              'Cerrar sesión',
-              style: AppTypography.ralewayRegular(
-                fontSize: 14,
-                color: AppColors.raizSagrada.withValues(alpha: 0.6),
-              ),
+                const SizedBox(height: 50),
+                // Opciones del menú
+                _MenuItem(
+                  icon: Icons.vpn_key_outlined,
+                  label: AppConstants.portals,
+                  onTap: () {},
+                ),
+                _MenuItem(
+                  icon: Icons.library_books_outlined,
+                  label: AppConstants.myLibrary,
+                  onTap: () {},
+                ),
+                _MenuItem(
+                  icon: Icons.auto_awesome_outlined,
+                  label: AppConstants.myAccount,
+                  onTap: () {},
+                ),
+                _MenuItem(
+                  icon: Icons.description_outlined,
+                  label: AppConstants.termsConditions,
+                  onTap: () {},
+                ),
+                _MenuItem(
+                  icon: Icons.mail_outline,
+                  label: AppConstants.contactUs,
+                  onTap: () {},
+                ),
+                const SizedBox(height: 40),
+              ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-class _ProfileOption extends StatelessWidget {
+class _MenuItem extends StatelessWidget {
   final IconData icon;
-  final String title;
+  final String label;
   final VoidCallback onTap;
 
-  const _ProfileOption({
+  const _MenuItem({
     required this.icon,
-    required this.title,
+    required this.label,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.raizSagrada.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.raizSagrada),
-        title: Text(
-          title,
-          style: AppTypography.ralewayRegular(fontSize: 15),
-        ),
-        trailing: const Icon(
-          Icons.chevron_right,
-          color: AppColors.raizSagrada,
-        ),
-        onTap: onTap,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.raizSagrada,
+              size: 24,
+            ),
+            const SizedBox(width: 16),
+            Text(
+              label,
+              style: AppTypography.ralewayRegular(
+                fontSize: 16,
+                color: AppColors.raizSagrada,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
-
