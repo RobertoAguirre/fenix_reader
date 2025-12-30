@@ -69,7 +69,13 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
       if (mounted) {
         setState(() {
           _isPlaying = state.playing;
-          _isLoading = state.processingState == ProcessingState.loading;
+          // Solo mostrar loading si realmente se está cargando inicialmente
+          // No mostrar si ya tiene duración (audio ya está listo)
+          if (state.processingState == ProcessingState.loading && _duration == null) {
+            _isLoading = true;
+          } else if (state.processingState != ProcessingState.loading) {
+            _isLoading = false;
+          }
         });
       }
     });
@@ -218,8 +224,9 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
                 ),
               ),
 
-            // Loading
-            if (_isLoading || _isDownloading)
+            // Loading - Solo mostrar si realmente se está descargando o cargando inicialmente
+            // No mostrar si el audio ya tiene duración (ya está listo)
+            if ((_isLoading || _isDownloading) && _duration == null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Column(
@@ -239,8 +246,8 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
                 ),
               ),
 
-            // Controles
-            if (!_isLoading && _error == null) ...[
+            // Controles - Mostrar cuando el audio está listo (tiene duración) y no hay error
+            if (_duration != null && _error == null) ...[
               // Barra de progreso
               Slider(
                 value: _duration != null && _duration!.inMilliseconds > 0
