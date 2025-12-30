@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../config/theme.dart';
@@ -44,6 +45,11 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
   Duration _position = Duration.zero;
   Duration? _duration;
   bool _isPlaying = false;
+  
+  // Suscripciones de streams para poder cancelarlas
+  StreamSubscription<Duration>? _positionSubscription;
+  StreamSubscription<Duration?>? _durationSubscription;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
 
   @override
   void initState() {
@@ -53,19 +59,19 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
   }
 
   void _setupAudioListeners() {
-    _audioService.positionStream.listen((position) {
+    _positionSubscription = _audioService.positionStream.listen((position) {
       if (mounted) {
         setState(() => _position = position);
       }
     });
 
-    _audioService.durationStream.listen((duration) {
+    _durationSubscription = _audioService.durationStream.listen((duration) {
       if (mounted) {
         setState(() => _duration = duration);
       }
     });
 
-    _audioService.playerStateStream.listen((state) {
+    _playerStateSubscription = _audioService.playerStateStream.listen((state) {
       if (mounted) {
         setState(() {
           _isPlaying = state.playing;
@@ -162,6 +168,10 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
 
   @override
   void dispose() {
+    // Cancelar todas las suscripciones antes de eliminar el widget
+    _positionSubscription?.cancel();
+    _durationSubscription?.cancel();
+    _playerStateSubscription?.cancel();
     _audioService.dispose();
     super.dispose();
   }
