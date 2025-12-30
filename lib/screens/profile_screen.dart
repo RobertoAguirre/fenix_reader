@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
+import '../providers/auth_provider.dart';
 
 /// Pantalla de Perfil/Menú
 class ProfileScreen extends StatelessWidget {
@@ -33,16 +35,21 @@ class ProfileScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       const FenixLogo(
-                        size: 120,
+                        size: 160,
                         color: AppColors.raizSagrada,
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Wendy Staufert',
-                        style: AppTypography.kaushanTitle(
-                          fontSize: 22,
-                          color: AppColors.raizSagrada,
-                        ),
+                      const SizedBox(height: 20),
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, _) {
+                          final displayName = authProvider.user?.displayName ?? 'Usuario';
+                          return Text(
+                            displayName,
+                            style: AppTypography.kaushanTitle(
+                              fontSize: 22,
+                              color: AppColors.raizSagrada,
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../widgets/fenix_bottom_nav.dart';
+import '../providers/auth_provider.dart';
 import 'library_screen.dart';
 import 'portal_screen.dart';
 import 'profile_screen.dart';
@@ -68,12 +70,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: AppColors.expansionAlquimica,
                         ),
                         const SizedBox(height: 12),
-                        Text(
-                          'Wendy Staufert',
-                          style: AppTypography.kaushanTitle(
-                            fontSize: 20,
-                            color: AppColors.expansionAlquimica,
-                          ),
+                        Consumer<AuthProvider>(
+                          builder: (context, authProvider, _) {
+                            final displayName = authProvider.user?.displayName ?? 'Usuario';
+                            return Text(
+                              displayName,
+                              style: AppTypography.kaushanTitle(
+                                fontSize: 20,
+                                color: AppColors.expansionAlquimica,
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),

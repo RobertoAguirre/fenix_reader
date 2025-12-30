@@ -47,8 +47,8 @@ class ContentListItem extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _PlaceholderBox(),
-                        errorWidget: (_, __, ___) => _PlaceholderBox(),
+                        placeholder: (context, url) => _PlaceholderBox(),
+                        errorWidget: (context, url, error) => _PlaceholderBox(),
                       )
                     : _PlaceholderBox(),
               ),
@@ -145,8 +145,8 @@ class ContentFeatureCard extends StatelessWidget {
                     ? CachedNetworkImage(
                         imageUrl: imageUrl!,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => _PlaceholderBox(),
-                        errorWidget: (_, __, ___) => _PlaceholderBox(),
+                        placeholder: (context, url) => _PlaceholderBox(),
+                        errorWidget: (context, url, error) => _PlaceholderBox(),
                       )
                     : _PlaceholderBox(),
               ),

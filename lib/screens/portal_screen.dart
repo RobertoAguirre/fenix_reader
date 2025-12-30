@@ -5,6 +5,8 @@ import '../config/constants.dart';
 import '../providers/content_provider.dart';
 import '../services/wordpress_service.dart';
 import '../widgets/content_card.dart';
+import '../widgets/audio_player_modal.dart';
+import '../utils/audio_helper.dart';
 
 /// Pantalla de Portales/Inicio con tabs
 class PortalScreen extends StatefulWidget {
@@ -377,7 +379,35 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   void _onItemTap(ContentItem item) {
-    // TODO: Navegar a reproductor
-    debugPrint('Reproducir: ${item.title}');
+    if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No hay URL de audio disponible para ${item.title}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Verificar si es una URL de audio
+    if (!AudioHelper.isAudioUrl(item.downloadUrl)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('El contenido no tiene un formato de audio válido'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Normalizar URL (convertir Google Drive si es necesario)
+    final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
+    
+    // Abrir reproductor de audio
+    showAudioPlayer(
+      context: context,
+      audioUrl: audioUrl,
+      title: item.title,
+    );
   }
 }

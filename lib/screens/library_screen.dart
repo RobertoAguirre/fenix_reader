@@ -4,6 +4,9 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
 import '../services/wordpress_service.dart';
+import '../services/favorites_service.dart';
+import '../widgets/audio_player_modal.dart';
+import '../utils/audio_helper.dart';
 
 /// Pantalla de Biblioteca
 class LibraryScreen extends StatefulWidget {
@@ -17,8 +20,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
   int _selectedTab = 0;
   final _tabs = [AppConstants.myContent, AppConstants.favorites];
   
-  // IDs de favoritos (local por ahora)
+  final FavoritesService _favoritesService = FavoritesService();
   final Set<int> _favoriteIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  Future<void> _loadFavorites() async {
+    final favorites = await _favoritesService.getFavorites();
+    setState(() {
+      _favoriteIds.clear();
+      _favoriteIds.addAll(favorites);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,16 +144,40 @@ class _LibraryScreenState extends State<LibraryScreen> {
               subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
               isFavorite: isFavorite,
               onTap: () {
-                debugPrint('Reproducir: ${item.title}');
+                if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('No hay URL de audio disponible para ${item.title}'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                // Verificar si es una URL de audio
+                if (!AudioHelper.isAudioUrl(item.downloadUrl)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('El contenido no tiene un formato de audio válido'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                // Normalizar URL (convertir Google Drive si es necesario)
+                final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
+                
+                // Abrir reproductor de audio
+                showAudioPlayer(
+                  context: context,
+                  audioUrl: audioUrl,
+                  title: item.title,
+                );
               },
-              onFavoriteTap: () {
-                setState(() {
-                  if (isFavorite) {
-                    _favoriteIds.remove(item.id);
-                  } else {
-                    _favoriteIds.add(item.id);
-                  }
-                });
+              onFavoriteTap: () async {
+                await _favoritesService.toggleFavorite(item.id);
+                await _loadFavorites();
               },
             );
           },

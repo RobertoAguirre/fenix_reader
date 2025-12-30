@@ -113,39 +113,38 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildBody() {
     return Stack(
       children: [
-        // Watermark Logo Fénix
-        Positioned(
-          top: 20,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Opacity(
-              opacity: 0.15,
-              child: FenixLogo(
-                size: 180,
-                color: AppColors.raizSagrada,
+        // Watermark Logo Fénix - Grande detrás del contenido
+        Center(
+          child: Opacity(
+            opacity: 0.30,
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 1.8,
+              height: MediaQuery.of(context).size.width * 1.8,
+              child: Image.asset(
+                'assets/images/logotriangulo.png',
+                fit: BoxFit.contain,
               ),
             ),
           ),
         ),
         // Watermark Firma
-        Positioned(
-          bottom: 80,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Opacity(
-              opacity: 0.2,
-              child: Text(
-                'Wendy Staufert',
-                style: AppTypography.kaushanTitle(
-                  fontSize: 42,
-                  color: AppColors.raizSagrada,
-                ),
-              ),
-            ),
-          ),
-        ),
+        // Positioned(
+        //   bottom: 80,
+        //   left: 0,
+        //   right: 0,
+        //   child: Center(
+        //     child: Opacity(
+        //       opacity: 0.2,
+        //       child: Text(
+        //         'Wendy Staufert',
+        //         style: AppTypography.kaushanTitle(
+        //           fontSize: 42,
+        //           color: AppColors.raizSagrada,
+        //         ),
+        //       ),
+        //     ),
+        //   ),
+        // ),
         // Contenido del formulario
         SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32),
