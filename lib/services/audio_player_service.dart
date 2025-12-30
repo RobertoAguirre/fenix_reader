@@ -60,6 +60,16 @@ class AudioPlayerService {
     }
   }
 
+  /// Reanudar reproducción (sin recargar)
+  Future<void> resume() async {
+    try {
+      await _player.play();
+    } catch (e) {
+      debugPrint('❌ Error reanudando audio: $e');
+      rethrow;
+    }
+  }
+
   /// Detener reproducción
   Future<void> stop() async {
     try {

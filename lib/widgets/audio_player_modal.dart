@@ -107,8 +107,13 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
     if (_isPlaying) {
       await _audioService.pause();
     } else {
-      final normalizedUrl = AudioHelper.normalizeAudioUrl(widget.audioUrl);
-      await _audioService.play(normalizedUrl);
+      // Si ya está cargado, solo reanudar. Si no, cargar y reproducir
+      if (_audioService.duration != null) {
+        await _audioService.resume();
+      } else {
+        final normalizedUrl = AudioHelper.normalizeAudioUrl(widget.audioUrl);
+        await _audioService.play(normalizedUrl);
+      }
     }
   }
 
