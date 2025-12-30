@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../config/theme.dart';
 import '../services/audio_player_service.dart';
+import '../services/audio_cache_service.dart';
 import '../utils/audio_helper.dart';
 
 /// Función helper para mostrar el reproductor de audio
@@ -38,6 +39,7 @@ class _AudioPlayerContent extends StatefulWidget {
 class _AudioPlayerContentState extends State<_AudioPlayerContent> {
   final AudioPlayerService _audioService = AudioPlayerService();
   bool _isLoading = true;
+  bool _isDownloading = false;
   String? _error;
   Duration _position = Duration.zero;
   Duration? _duration;
@@ -78,26 +80,42 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
       setState(() {
         _error = 'URL de audio no válida';
         _isLoading = false;
+        _isDownloading = false;
       });
       return;
     }
 
     setState(() {
       _isLoading = true;
+      _isDownloading = false;
       _error = null;
     });
 
     try {
       // Normalizar URL (convertir Google Drive a enlace directo si es necesario)
       final normalizedUrl = AudioHelper.normalizeAudioUrl(widget.audioUrl);
+      
+      // Verificar si está en caché antes de descargar
+      final cacheService = AudioCacheService();
+      final cachedPath = await cacheService.getCachedFilePath(normalizedUrl);
+      
+      if (cachedPath == null) {
+        // No está en caché, mostrar indicador de descarga
+        setState(() {
+          _isDownloading = true;
+        });
+      }
+      
       await _audioService.play(normalizedUrl);
       setState(() {
         _isLoading = false;
+        _isDownloading = false;
       });
     } catch (e) {
       setState(() {
         _error = 'Error al cargar el audio';
         _isLoading = false;
+        _isDownloading = false;
       });
       debugPrint('❌ Error cargando audio: $e');
     }
@@ -201,10 +219,24 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
               ),
 
             // Loading
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: CircularProgressIndicator(color: AppColors.ascenso),
+            if (_isLoading || _isDownloading)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.ascenso),
+                    const SizedBox(height: 16),
+                    Text(
+                      _isDownloading 
+                          ? 'Descargando y guardando audio...' 
+                          : 'Cargando audio...',
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 14,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
             // Controles
