@@ -4,10 +4,14 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../providers/auth_provider.dart';
+import 'terms_screen.dart';
+import 'login_screen.dart';
 
 /// Pantalla de Perfil/Menú
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  final Function(int)? onNavigateToIndex;
+  
+  const ProfileScreen({super.key, this.onNavigateToIndex});
 
   @override
   Widget build(BuildContext context) {
@@ -59,27 +63,49 @@ class ProfileScreen extends StatelessWidget {
                 _MenuItem(
                   icon: Icons.vpn_key_outlined,
                   label: AppConstants.portals,
-                  onTap: () {},
+                  onTap: () {
+                    if (onNavigateToIndex != null) {
+                      onNavigateToIndex!(0);
+                    }
+                  },
                 ),
                 _MenuItem(
                   icon: Icons.library_books_outlined,
                   label: AppConstants.myLibrary,
-                  onTap: () {},
-                ),
-                _MenuItem(
-                  icon: Icons.auto_awesome_outlined,
-                  label: AppConstants.myAccount,
-                  onTap: () {},
+                  onTap: () {
+                    if (onNavigateToIndex != null) {
+                      onNavigateToIndex!(1);
+                    }
+                  },
                 ),
                 _MenuItem(
                   icon: Icons.description_outlined,
                   label: AppConstants.termsConditions,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TermsScreen(),
+                      ),
+                    );
+                  },
                 ),
+                const SizedBox(height: 20),
                 _MenuItem(
-                  icon: Icons.mail_outline,
-                  label: AppConstants.contactUs,
-                  onTap: () {},
+                  icon: Icons.logout,
+                  label: 'Cerrar sesión',
+                  onTap: () async {
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    await authProvider.logout();
+                    if (context.mounted) {
+                      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const LoginScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    }
+                  },
                 ),
                 const SizedBox(height: 40),
               ],

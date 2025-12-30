@@ -21,11 +21,19 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  final _screens = const [
-    PortalScreen(),
-    LibraryScreen(),
-    ProfileScreen(),
-  ];
+  final List<Widget> _screens = [];
+  
+  @override
+  void initState() {
+    super.initState();
+    _screens.addAll([
+      const PortalScreen(),
+      const LibraryScreen(),
+      ProfileScreen(
+        onNavigateToIndex: (index) => setState(() => _currentIndex = index),
+      ),
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) {
