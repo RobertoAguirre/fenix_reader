@@ -32,17 +32,17 @@ class FenixBottomNav extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _NavItem(
-                icon: Icons.vpn_key_outlined,
+                imagePath: 'assets/images/ankh.png',
                 isSelected: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
               _NavItem(
-                icon: Icons.location_on_outlined,
+                imagePath: 'assets/images/biblioteca.png',
                 isSelected: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
               _NavItem(
-                icon: Icons.person_outline,
+                imagePath: 'assets/images/user.png',
                 isSelected: currentIndex == 2,
                 onTap: () => onTap(2),
               ),
@@ -55,12 +55,12 @@ class FenixBottomNav extends StatelessWidget {
 }
 
 class _NavItem extends StatelessWidget {
-  final IconData icon;
+  final String imagePath;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _NavItem({
-    required this.icon,
+    required this.imagePath,
     required this.isSelected,
     required this.onTap,
   });
@@ -69,9 +69,10 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Icon(
-        icon,
-        size: 28,
+      child: Image.asset(
+        imagePath,
+        width: 28,
+        height: 28,
         color: isSelected ? AppColors.ascenso : AppColors.expansionAlquimica,
       ),
     );
