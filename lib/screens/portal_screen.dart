@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/wordpress_service.dart';
 import '../widgets/content_card.dart';
 import '../widgets/audio_player_modal.dart';
@@ -54,28 +55,19 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Builder(
-                builder: (context) => GestureDetector(
-                  onTap: () => Scaffold.of(context).openDrawer(),
-                  child: const Icon(
-                    Icons.menu,
-                    color: AppColors.white,
-                    size: 24,
-                  ),
-                ),
-              ),
-              const Spacer(),
-            ],
-          ),
           const SizedBox(height: 8),
-          Text(
-            'Buenas tardes,',
-            style: AppTypography.kaushanTitle(
-              fontSize: 20,
-              color: AppColors.white,
-            ),
+          Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              final fullName = authProvider.user?.displayName ?? '';
+              final firstName = fullName.split(' ').first;
+              return Text(
+                'Buenas tardes, $firstName',
+                style: AppTypography.kaushanTitle(
+                  fontSize: 20,
+                  color: AppColors.white,
+                ),
+              );
+            },
           ),
         ],
       ),
