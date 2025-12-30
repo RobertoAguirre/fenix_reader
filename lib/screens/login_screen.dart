@@ -5,7 +5,6 @@ import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/content_provider.dart';
 import '../widgets/fenix_logo.dart';
-import '../widgets/fenix_bottom_nav.dart';
 
 /// Pantalla de Login
 class LoginScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-  int _navIndex = 2; // Perfil seleccionado por defecto en login
 
   @override
   void dispose() {
@@ -78,13 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: FenixBottomNav(
-        currentIndex: _navIndex,
-        onTap: (index) {
-          // Al tocar cualquier nav, entrar a la app
-          widget.onLoginSuccess?.call();
-        },
-      ),
+      // Barra de navegación oculta cuando no está logueado
     );
   }
 
