@@ -118,7 +118,7 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
         });
       }
       
-      await _audioService.play(normalizedUrl);
+      await _audioService.play(normalizedUrl, title: widget.title);
       setState(() {
         _isLoading = false;
         _isDownloading = false;
@@ -142,7 +142,7 @@ class _AudioPlayerContentState extends State<_AudioPlayerContent> {
         await _audioService.resume();
       } else {
         final normalizedUrl = AudioHelper.normalizeAudioUrl(widget.audioUrl);
-        await _audioService.play(normalizedUrl);
+        await _audioService.play(normalizedUrl, title: widget.title);
       }
     }
   }

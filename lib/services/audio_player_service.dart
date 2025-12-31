@@ -21,7 +21,7 @@ class AudioPlayerService {
   bool get isLoading => _player.processingState == ProcessingState.loading;
 
   /// Reproducir audio desde URL (usa caché local si está disponible)
-  Future<void> play(String url) async {
+  Future<void> play(String url, {String? title}) async {
     try {
       // Intentar obtener archivo en caché
       final cachedPath = await _cacheService.getCachedFilePath(url);
