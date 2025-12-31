@@ -45,7 +45,69 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>wendystaufert.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<true/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+			</dict>
+			<key>drive.google.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<true/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+			</dict>
+			<key>docs.google.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<true/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+			</dict>
+			<key>vimeo.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<false/>
+				<key>NSExceptionRequiresForwardSecrecy</key>
+				<true/>
+				<key>NSExceptionMinimumTLSVersion</key>
+				<string>TLSv1.2</string>
+			</dict>
+		</dict>
+	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>No se graba, no se accede al micrófono, y no se almacena ningún audio. El permiso es requerido por las librerías de audio utilizadas para reproducción únicamente.</string>
+	<string>Esta aplicación reproduce contenido de audio. El permiso del micrófono es requerido por las librerías de audio para habilitar la reproducción a través de dispositivos Bluetooth y auriculares. No se graba ni se almacena ningún audio.</string>
+	<key>NSBluetoothUsageDescription</key>
+	<string>Esta aplicación reproduce audio a través de dispositivos Bluetooth como auriculares y altavoces. No se accede a otros datos de Bluetooth.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Esta aplicación reproduce audio a través de dispositivos Bluetooth como auriculares y altavoces. El acceso a Bluetooth es necesario para mantener la conexión durante la reproducción de audio.</string>
 </dict>
 </plist>
