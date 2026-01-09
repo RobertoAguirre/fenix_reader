@@ -28,12 +28,20 @@ class _PortalScreenState extends State<PortalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.origen,
+      backgroundColor: AppColors.raizSagrada,
       body: Column(
         children: [
           _buildHeader(),
           Expanded(
-            child: _buildContent(),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: AppColors.origen,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+              ),
+              child: _buildContent(),
+            ),
           ),
         ],
       ),
@@ -383,13 +391,13 @@ class _PortalScreenState extends State<PortalScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
-                              Icons.book_outlined,
+                              Icons.play_arrow,
                               color: AppColors.white,
-                              size: 16,
+                              size: 18,
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'Leer ahora',
+                              'Escuchar',
                               style: AppTypography.ralewayBold(
                                 fontSize: 12,
                                 color: AppColors.white,
