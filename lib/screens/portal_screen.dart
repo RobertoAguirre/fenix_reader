@@ -88,13 +88,13 @@ class _PortalScreenState extends State<PortalScreen> {
               _buildTabs(),
               const SizedBox(height: 20),
               // Título de sección
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              Center(
                 child: Text(
                   'Fénix alquimista',
+                  textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
-                    color: AppColors.expansionAlquimica,
+                    color: AppColors.raizSagrada,
                   ),
                 ),
               ),
@@ -102,7 +102,7 @@ class _PortalScreenState extends State<PortalScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'Recursos para tu camino de transformación',
+                  'Recursos para almas comprometidas en su camino',
                   style: AppTypography.ralewayRegular(
                     fontSize: 13,
                     color: AppColors.raizSagrada.withValues(alpha: 0.7),
@@ -145,24 +145,32 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Row(
         children: List.generate(_tabs.length, (index) {
           final isSelected = index == _selectedTab;
+          Color tabColor;
+          if (isSelected) {
+            tabColor = AppColors.raizSagrada; // Tab activo: fondo oscuro
+          } else if (index == 1) {
+            tabColor = AppColors.ascenso; // HIPNOSIS: azul-verde claro
+          } else {
+            tabColor = AppColors.expansionAlquimica; // MEDITACIONES: verde oliva
+          }
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
               onTap: () => setState(() => _selectedTab = index),
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 10,
+                  horizontal: 12,
+                  vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.white : AppColors.expansionAlquimica,
-                  borderRadius: BorderRadius.circular(20),
+                  color: tabColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _tabs[index],
                   style: AppTypography.ralewayBold(
-                    fontSize: 11,
-                    color: isSelected ? AppColors.raizSagrada : AppColors.white,
+                    fontSize: 13,
+                    color: AppColors.white,
                   ),
                 ),
               ),
@@ -247,7 +255,7 @@ class _PortalScreenState extends State<PortalScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: AppColors.raizSagrada.withValues(alpha: 0.1),
@@ -259,7 +267,7 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen placeholder turquesa
+          // Gradiente azul-verde
           Container(
             width: double.infinity,
             height: 180,
@@ -268,11 +276,11 @@ class _PortalScreenState extends State<PortalScreen> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.ascenso,
-                  Color(0xFF9DD5D5),
+                  Color(0xFFB0E0E6), // Azul claro
+                  Color(0xFF98D8C8), // Verde claro
                 ],
               ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
             child: Center(
               child: Column(
@@ -282,14 +290,14 @@ class _PortalScreenState extends State<PortalScreen> {
                     'FÉNIX',
                     style: AppTypography.ralewayBold(
                       fontSize: 32,
-                      color: AppColors.raizSagrada,
+                      color: AppColors.white,
                     ),
                   ),
                   Text(
-                    item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
+                    item.title.contains('Mensajes') ? 'Mensajes del universo' : (item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación'),
                     style: AppTypography.kaushanTitle(
                       fontSize: 22,
-                      color: AppColors.raizSagrada,
+                      color: AppColors.white,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -297,7 +305,7 @@ class _PortalScreenState extends State<PortalScreen> {
                     'Wendy Staufert',
                     style: AppTypography.kaushanTitle(
                       fontSize: 14,
-                      color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                      color: AppColors.expansionAlquimica,
                     ),
                   ),
                 ],
@@ -330,37 +338,70 @@ class _PortalScreenState extends State<PortalScreen> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                // Botón reproducir
-                GestureDetector(
-                  onTap: () => _onItemTap(item),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.ascenso,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.play_circle_outline,
-                          color: AppColors.white,
-                          size: 16,
+                // Botones
+                Row(
+                  children: [
+                    GestureDetector(
+                      onTap: () => _onItemTap(item),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Reproducir',
-                          style: AppTypography.ralewayBold(
-                            fontSize: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.ascenso,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.book_outlined,
+                              color: AppColors.white,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Leer ahora',
+                              style: AppTypography.ralewayBold(
+                                fontSize: 12,
+                                color: AppColors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.ascenso,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_outline,
                             color: AppColors.white,
+                            size: 16,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Text(
+                            'Gratuito',
+                            style: AppTypography.ralewayBold(
+                              fontSize: 12,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
