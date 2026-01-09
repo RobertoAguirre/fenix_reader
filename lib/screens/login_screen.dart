@@ -20,6 +20,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
 
   @override
@@ -183,9 +184,20 @@ class _LoginScreenState extends State<LoginScreen> {
               // Campo contraseña
               TextField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: AppConstants.passwordHint,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 30),

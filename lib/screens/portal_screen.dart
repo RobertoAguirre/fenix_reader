@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
@@ -260,10 +261,55 @@ class _PortalScreenState extends State<PortalScreen> {
         ...items.skip(1).map((item) => ContentListItem(
           title: item.title,
           subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
+          imageUrl: item.image,
           onTap: () => _onItemTap(item),
           onFavoriteTap: () {},
         )),
       ],
+    );
+  }
+
+  Widget _buildGradientFallback(ContentItem item) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFB0E0E6), // Azul claro
+            Color(0xFF98D8C8), // Verde claro
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'FÉNIX',
+              style: AppTypography.ralewayBold(
+                fontSize: 32,
+                color: AppColors.white,
+              ),
+            ),
+            Text(
+              item.title.contains('Mensajes') ? 'Mensajes del universo' : (item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación'),
+              style: AppTypography.kaushanTitle(
+                fontSize: 22,
+                color: AppColors.white,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Wendy Staufert',
+              style: AppTypography.kaushanTitle(
+                fontSize: 14,
+                color: AppColors.expansionAlquimica,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -284,49 +330,36 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gradiente azul-verde
-          Container(
-            width: double.infinity,
-            height: _selectedTab == 0 ? 300 : 180,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFFB0E0E6), // Azul claro
-                  Color(0xFF98D8C8), // Verde claro
-                ],
-              ),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'FÉNIX',
-                    style: AppTypography.ralewayBold(
-                      fontSize: 32,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  Text(
-                    item.title.contains('Mensajes') ? 'Mensajes del universo' : (item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación'),
-                    style: AppTypography.kaushanTitle(
-                      fontSize: 22,
-                      color: AppColors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Wendy Staufert',
-                    style: AppTypography.kaushanTitle(
-                      fontSize: 14,
-                      color: AppColors.expansionAlquimica,
-                    ),
-                  ),
-                ],
-              ),
+          // Imagen del contenido o gradiente como fallback
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: SizedBox(
+              width: double.infinity,
+              height: _selectedTab == 0 ? 300 : 180,
+              child: item.image != null && item.image!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: item.image!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0xFFB0E0E6),
+                              Color(0xFF98D8C8),
+                            ],
+                          ),
+                        ),
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => _buildGradientFallback(item),
+                    )
+                  : _buildGradientFallback(item),
             ),
           ),
           // Contenido del card
