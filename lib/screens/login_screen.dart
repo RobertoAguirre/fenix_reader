@@ -43,18 +43,37 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
+    debugPrint('🔐 Intentando login con: $email');
+    
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.login(email, password);
 
+    debugPrint('🔐 Resultado login: $success');
+
     if (success) {
-      // Cargar contenido del usuario en el provider
-      if (mounted) {
-        await context.read<ContentProvider>().loadUserContent(email);
-      }
+      debugPrint('✅ Login exitoso, llamando onLoginSuccess...');
+      debugPrint('🔍 onLoginSuccess es null? ${widget.onLoginSuccess == null}');
       
-      setState(() => _isLoading = false);
-      widget.onLoginSuccess?.call();
+      // Navegar primero, luego cargar contenido en background
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        // Llamar callback de navegación
+        if (widget.onLoginSuccess != null) {
+          debugPrint('🚀 Ejecutando onLoginSuccess callback');
+          widget.onLoginSuccess!();
+        } else {
+          debugPrint('⚠️ onLoginSuccess es NULL - no se puede navegar');
+        }
+        
+        // Cargar contenido en background después de navegar
+        context.read<ContentProvider>().loadUserContent(email).catchError((error) {
+          debugPrint('⚠️ Error cargando contenido después del login: $error');
+          // No bloquear la navegación si falla la carga de contenido
+        });
+      }
     } else {
+      debugPrint('❌ Login falló: ${authProvider.error}');
       setState(() {
         _isLoading = false;
         _errorMessage = authProvider.error ?? 'Error al iniciar sesión';

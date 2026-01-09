@@ -112,6 +112,17 @@ class WordPressService {
         await _cacheService.saveCachedPurchases(email, data);
         
         debugPrint('✅ Contenido del usuario: ${data.length} items');
+        
+        // Debug: mostrar campos disponibles en el primer item
+        if (data.isNotEmpty) {
+          final firstItem = data.first as Map<String, dynamic>;
+          debugPrint('📋 Campos disponibles en el primer item:');
+          firstItem.keys.forEach((key) {
+            final value = firstItem[key];
+            debugPrint('  - $key: ${value != null ? (value.toString().length > 100 ? value.toString().substring(0, 100) + '...' : value.toString()) : 'null'}');
+          });
+        }
+        
         return data.map((item) => ContentItem.fromJson(item as Map<String, dynamic>)).toList();
       } else {
         debugPrint('⚠️ Error obteniendo contenido: ${response.statusCode}');
@@ -696,7 +707,11 @@ class ContentItem {
              json['post_title'] as String? ?? 
              json['name'] as String? ?? 
              'Sin título',
-      description: json['description'] as String? ?? json['excerpt'] as String?,
+      description: json['description'] as String? ?? 
+                   json['excerpt'] as String? ??
+                   json['content'] as String? ??
+                   json['post_content'] as String? ??
+                   json['summary'] as String?,
       category: json['category'] as String? ?? 
                 (json['categories'] is List && (json['categories'] as List).isNotEmpty
                     ? (json['categories'] as List)[0].toString()

@@ -5,8 +5,12 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../providers/auth_provider.dart';
+import '../providers/content_provider.dart';
+import '../providers/membership_provider.dart';
+import '../providers/program_provider.dart';
+import '../services/cache_service.dart';
+import '../main.dart';
 import 'terms_screen.dart';
-import 'login_screen.dart';
 
 /// Pantalla de Perfil/Menú
 class ProfileScreen extends StatelessWidget {
@@ -115,12 +119,34 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.exit_to_app,
                   label: 'Cerrar sesión',
                   onTap: () async {
+                    // Obtener email del usuario antes de hacer logout
                     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final userEmail = authProvider.user?.email;
+                    
+                    // Limpiar todos los providers
+                    final contentProvider = Provider.of<ContentProvider>(context, listen: false);
+                    final membershipProvider = Provider.of<MembershipProvider>(context, listen: false);
+                    final programProvider = Provider.of<ProgramProvider>(context, listen: false);
+                    
+                    // Limpiar contenido y caché
+                    contentProvider.clear();
+                    membershipProvider.clear();
+                    programProvider.clear();
+                    
+                    // Limpiar caché si tenemos el email
+                    if (userEmail != null) {
+                      final cacheService = CacheService();
+                      await cacheService.clearPurchasesCache(userEmail);
+                    }
+                    
+                    // Logout de autenticación (esto limpia el storage)
                     await authProvider.logout();
+                    
+                    // Navegar al AppNavigator para que muestre el LoginScreen con el callback
                     if (context.mounted) {
                       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                         MaterialPageRoute(
-                          builder: (context) => const LoginScreen(),
+                          builder: (context) => const AppNavigator(),
                         ),
                         (route) => false,
                       );

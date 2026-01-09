@@ -60,11 +60,14 @@ class _PortalScreenState extends State<PortalScreen> {
             builder: (context, authProvider, _) {
               final fullName = authProvider.user?.displayName ?? '';
               final firstName = fullName.split(' ').first;
+              final capitalizedName = firstName.isNotEmpty
+                  ? firstName[0].toUpperCase() + firstName.substring(1)
+                  : firstName;
               return Text(
-                'Buenas tardes, $firstName',
+                'Buenas tardes, $capitalizedName',
                 style: AppTypography.kaushanTitle(
                   fontSize: 20,
-                  color: AppColors.white,
+                  color: AppColors.expansionAlquimica,
                 ),
               );
             },
@@ -86,7 +89,7 @@ class _PortalScreenState extends State<PortalScreen> {
             children: [
               const SizedBox(height: 12),
               _buildTabs(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 25),
               // Título de sección
               Center(
                 child: Text(
@@ -98,18 +101,18 @@ class _PortalScreenState extends State<PortalScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              const SizedBox(height: 20),
+              Center(
                 child: Text(
                   'Recursos para almas comprometidas en su camino',
+                  textAlign: TextAlign.center,
                   style: AppTypography.ralewayRegular(
-                    fontSize: 13,
+                    fontSize: 15,
                     color: AppColors.raizSagrada.withValues(alpha: 0.7),
-                  ),
+                  ).copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               // Mostrar contenido o estado vacío
               if (provider.isLoading)
                 _buildLoading()
@@ -234,6 +237,12 @@ class _PortalScreenState extends State<PortalScreen> {
     // Mostrar primer item como destacado si hay contenido
     if (items.isEmpty) return const SizedBox.shrink();
 
+    // En INICIO solo mostrar la tarjeta destacada, sin listado
+    if (_selectedTab == 0) {
+      return _buildFeatureCard(items.first);
+    }
+
+    // En otras pestañas mostrar tarjeta + listado
     return Column(
       children: [
         // Card destacado con el primer item
@@ -252,7 +261,7 @@ class _PortalScreenState extends State<PortalScreen> {
 
   Widget _buildFeatureCard(ContentItem item) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: EdgeInsets.symmetric(horizontal: _selectedTab == 0 ? 40 : 20),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(20),
@@ -270,7 +279,7 @@ class _PortalScreenState extends State<PortalScreen> {
           // Gradiente azul-verde
           Container(
             width: double.infinity,
-            height: 180,
+            height: _selectedTab == 0 ? 300 : 180,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
@@ -325,21 +334,39 @@ class _PortalScreenState extends State<PortalScreen> {
                     color: AppColors.raizSagrada,
                   ),
                 ),
-                if (item.description != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description!,
-                    style: AppTypography.ralewayRegular(
-                      fontSize: 13,
-                      color: AppColors.raizSagrada.withValues(alpha: 0.7),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                Builder(
+                  builder: (context) {
+                    // Debug: verificar qué tiene la descripción
+                    if (item.description != null) {
+                      debugPrint('📝 Descripción encontrada: ${item.description}');
+                    } else {
+                      debugPrint('⚠️ Descripción es null para: ${item.title}');
+                    }
+                    
+                    final cleanDescription = item.description?.replaceAll(RegExp(r'<[^>]*>'), '').trim() ?? '';
+                    
+                    if (cleanDescription.isNotEmpty) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 8),
+                          Text(
+                            cleanDescription,
+                            style: AppTypography.ralewayRegular(
+                              fontSize: 13,
+                              color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 const SizedBox(height: 12),
                 // Botones
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
                       onTap: () => _onItemTap(item),
@@ -372,7 +399,6 @@ class _PortalScreenState extends State<PortalScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,

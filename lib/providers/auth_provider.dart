@@ -48,11 +48,14 @@ class AuthProvider extends ChangeNotifier {
     return result.success;
   }
 
-  /// Logout
+  /// Logout - Limpia autenticación y notifica
   Future<void> logout() async {
+    debugPrint('🚪 AuthProvider: Iniciando logout');
     await _authService.logout();
     _error = null;
+    _isLoading = false;
     notifyListeners();
+    debugPrint('✅ AuthProvider: Logout completado');
   }
 
   /// Limpiar error

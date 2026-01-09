@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
@@ -64,12 +65,49 @@ class AppNavigator extends StatefulWidget {
 class _AppNavigatorState extends State<AppNavigator> {
   bool _isLoggedIn = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkSession();
+    });
+  }
+
+  Future<void> _checkSession() async {
+    if (!mounted) return;
+    
+    debugPrint('🔍 Verificando sesión guardada...');
+    final authProvider = context.read<AuthProvider>();
+    final hasSession = await authProvider.init();
+    debugPrint('🔍 Resultado verificación sesión: $hasSession');
+    
+    if (hasSession && mounted) {
+      final userEmail = authProvider.user?.email;
+      debugPrint('✅ Sesión válida encontrada para: $userEmail');
+      
+      // Cargar contenido del usuario si hay email
+      if (userEmail != null) {
+        debugPrint('📦 Cargando contenido del usuario...');
+        context.read<ContentProvider>().loadUserContent(userEmail);
+      }
+      
+      setState(() => _isLoggedIn = true);
+    } else {
+      debugPrint('❌ No hay sesión válida, mostrando LoginScreen');
+    }
+  }
+
   void _handleLoginSuccess() {
-    setState(() => _isLoggedIn = true);
+    debugPrint('✅ Login exitoso, navegando a HomeScreen');
+    if (mounted) {
+      setState(() => _isLoggedIn = true);
+    }
   }
 
   void _handleLogout() {
-    setState(() => _isLoggedIn = false);
+    if (mounted) {
+      setState(() => _isLoggedIn = false);
+    }
   }
 
   @override
