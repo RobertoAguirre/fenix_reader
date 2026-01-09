@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
@@ -24,44 +25,57 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 30),
-                // Saludo
-                Text(
-                  'Bienvenida a tu espacio fénix.',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 20,
-                    color: AppColors.expansionAlquimica,
+                const SizedBox(height: 10),
+                // Saludo con nombre completo
+                Center(
+                  child: Consumer<AuthProvider>(
+                    builder: (context, authProvider, _) {
+                      final displayName = authProvider.user?.displayName ?? 'Usuario';
+                      final capitalizedName = displayName.isNotEmpty
+                          ? displayName[0].toUpperCase() + displayName.substring(1)
+                          : displayName;
+                      return Column(
+                        children: [
+                          Text(
+                            '$capitalizedName,',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.kaushanTitle(
+                              fontSize: 24,
+                              color: AppColors.expansionAlquimica,
+                            ),
+                          ),
+                          Text(
+                            'Bienvenida a tu espacio fénix.',
+                            textAlign: TextAlign.center,
+                            style: AppTypography.kaushanTitle(
+                              fontSize: 24,
+                              color: AppColors.expansionAlquimica,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 1),
                 // Logo centrado
                 Center(
                   child: Column(
                     children: [
-                      const FenixLogo(
-                        size: 160,
-                        color: AppColors.raizSagrada,
-                      ),
-                      const SizedBox(height: 20),
-                      Consumer<AuthProvider>(
-                        builder: (context, authProvider, _) {
-                          final displayName = authProvider.user?.displayName ?? 'Usuario';
-                          return Text(
-                            displayName,
-                            style: AppTypography.kaushanTitle(
-                              fontSize: 22,
-                              color: AppColors.raizSagrada,
-                            ),
-                          );
-                        },
+                      Opacity(
+                        opacity: 0.7,
+                        child: const FenixLogo(
+                          size: 360,
+                          color: AppColors.raizSagrada,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 50),
+                const SizedBox(height: 1),
                 // Opciones del menú
                 _MenuItem(
-                  icon: Icons.vpn_key_outlined,
+                  imagePath: 'assets/images/ankh.png',
                   label: AppConstants.portals,
                   onTap: () {
                     if (onNavigateToIndex != null) {
@@ -70,7 +84,7 @@ class ProfileScreen extends StatelessWidget {
                   },
                 ),
                 _MenuItem(
-                  icon: Icons.library_books_outlined,
+                  imagePath: 'assets/images/biblioteca.png',
                   label: AppConstants.myLibrary,
                   onTap: () {
                     if (onNavigateToIndex != null) {
@@ -79,7 +93,7 @@ class ProfileScreen extends StatelessWidget {
                   },
                 ),
                 _MenuItem(
-                  icon: Icons.description_outlined,
+                  icon: Icons.article,
                   label: AppConstants.termsConditions,
                   onTap: () {
                     Navigator.push(
@@ -90,9 +104,15 @@ class ProfileScreen extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 20),
                 _MenuItem(
-                  icon: Icons.logout,
+                  icon: Icons.email,
+                  label: AppConstants.contactUs,
+                  onTap: () {
+                    // TODO: Abrir contacto
+                  },
+                ),
+                _MenuItem(
+                  icon: Icons.exit_to_app,
                   label: 'Cerrar sesión',
                   onTap: () async {
                     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -118,15 +138,17 @@ class ProfileScreen extends StatelessWidget {
 }
 
 class _MenuItem extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? imagePath;
   final String label;
   final VoidCallback onTap;
 
   const _MenuItem({
-    required this.icon,
+    this.icon,
+    this.imagePath,
     required this.label,
     required this.onTap,
-  });
+  }) : assert(icon != null || imagePath != null, 'Debe proporcionar icon o imagePath');
 
   @override
   Widget build(BuildContext context) {
@@ -134,22 +156,36 @@ class _MenuItem extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: AppColors.raizSagrada,
-              size: 24,
+        child: Center(
+          child: SizedBox(
+            width: 300,
+            child: Row(
+              children: [
+                if (imagePath != null)
+                  Image.asset(
+                    imagePath!,
+                    width: 24,
+                    height: 24,
+                    color: AppColors.raizSagrada,
+                  )
+                else if (icon != null)
+                  Icon(
+                    icon,
+                    color: AppColors.raizSagrada,
+                    size: 24,
+                  ),
+                const SizedBox(width: 16),
+                Text(
+                  label,
+                  style: GoogleFonts.raleway(
+                    fontSize: 18,
+                    color: AppColors.raizSagrada,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 16),
-            Text(
-              label,
-              style: AppTypography.ralewayRegular(
-                fontSize: 16,
-                color: AppColors.raizSagrada,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
