@@ -440,34 +440,35 @@ class _PortalScreenState extends State<PortalScreen> {
                         ),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.ascenso,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star_outline,
-                            color: AppColors.white,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Gratuito',
-                            style: AppTypography.ralewayBold(
-                              fontSize: 12,
-                              color: AppColors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    // Botón "Gratuito" comentado para evitar implicar contenido de pago
+                    // Container(
+                    //   padding: const EdgeInsets.symmetric(
+                    //     horizontal: 12,
+                    //     vertical: 10,
+                    //   ),
+                    //   decoration: BoxDecoration(
+                    //     color: AppColors.ascenso,
+                    //     borderRadius: BorderRadius.circular(8),
+                    //   ),
+                    //   child: Row(
+                    //     mainAxisSize: MainAxisSize.min,
+                    //     children: [
+                    //       const Icon(
+                    //         Icons.star_outline,
+                    //         color: AppColors.white,
+                    //         size: 16,
+                    //       ),
+                    //       const SizedBox(width: 6),
+                    //       Text(
+                    //         'Gratuito',
+                    //         style: AppTypography.ralewayBold(
+                    //           fontSize: 12,
+                    //           color: AppColors.white,
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
                   ],
                 ),
               ],
