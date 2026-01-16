@@ -8,8 +8,10 @@ class ContentProvider extends ChangeNotifier {
   UserContent? _content;
   List<ContentItem> _publicMeditaciones = [];
   List<ContentItem> _publicHipnosis = [];
+  List<Map<String, dynamic>> _programs = [];
   bool _isLoading = false;
   bool _isLoadingPublic = false;
+  bool _isLoadingPrograms = false;
   String? _error;
 
   UserContent? get content => _content;
@@ -25,6 +27,11 @@ class ContentProvider extends ChangeNotifier {
   
   /// Solo meditaciones del usuario
   List<ContentItem> get meditations => _content?.meditations ?? [];
+
+  /// Programas comprados del usuario
+  List<Map<String, dynamic>> get programs => _programs;
+  
+  bool get isLoadingPrograms => _isLoadingPrograms;
 
   /// Meditaciones públicas
   List<ContentItem> get publicMeditaciones => _publicMeditaciones;
@@ -84,6 +91,22 @@ class ContentProvider extends ChangeNotifier {
     }
   }
 
+  /// Cargar programas comprados del usuario
+  Future<void> loadUserPrograms(String email, {bool forceRefresh = false}) async {
+    _isLoadingPrograms = true;
+    notifyListeners();
+
+    try {
+      _programs = await _wpService.getUserPrograms(email, forceRefresh: forceRefresh);
+    } catch (e) {
+      _error = 'Error al cargar programas';
+      debugPrint('❌ Error cargando programas: $e');
+    } finally {
+      _isLoadingPrograms = false;
+      notifyListeners();
+    }
+  }
+
   /// Cargar contenido público
   Future<void> loadPublicContent() async {
     _isLoadingPublic = true;
@@ -105,6 +128,7 @@ class ContentProvider extends ChangeNotifier {
     _content = null;
     _publicMeditaciones = [];
     _publicHipnosis = [];
+    _programs = [];
     _error = null;
     notifyListeners();
   }

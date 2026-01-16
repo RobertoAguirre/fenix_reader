@@ -142,6 +142,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             return _LibraryListItem(
               title: item.title,
               subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
+              description: item.description,
               isFavorite: isFavorite,
               onTap: () {
                 if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
@@ -218,6 +219,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 class _LibraryListItem extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final String? description;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onFavoriteTap;
@@ -225,6 +227,7 @@ class _LibraryListItem extends StatelessWidget {
   const _LibraryListItem({
     required this.title,
     this.subtitle,
+    this.description,
     this.isFavorite = false,
     this.onTap,
     this.onFavoriteTap,
@@ -263,7 +266,7 @@ class _LibraryListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            // Título y subtítulo
+            // Título, subtítulo y descripción
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,6 +286,18 @@ class _LibraryListItem extends StatelessWidget {
                         fontSize: 12,
                         color: AppColors.raizSagrada.withValues(alpha: 0.6),
                       ),
+                    ),
+                  ],
+                  if (description != null && description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description!.replaceAll(RegExp(r'<[^>]*>'), '').trim(),
+                      style: AppTypography.ralewayLight(
+                        fontSize: 11,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],

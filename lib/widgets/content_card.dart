@@ -6,6 +6,7 @@ import '../config/theme.dart';
 class ContentListItem extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final String? description;
   final String? imageUrl;
   final bool isFavorite;
   final VoidCallback? onTap;
@@ -15,6 +16,7 @@ class ContentListItem extends StatelessWidget {
     super.key,
     required this.title,
     this.subtitle,
+    this.description,
     this.imageUrl,
     this.isFavorite = false,
     this.onTap,
@@ -54,7 +56,7 @@ class ContentListItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            // Título y subtítulo
+            // Título, subtítulo y descripción
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,6 +76,18 @@ class ContentListItem extends StatelessWidget {
                         fontSize: 12,
                         color: AppColors.raizSagrada.withValues(alpha: 0.6),
                       ),
+                    ),
+                  ],
+                  if (description != null && description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description!.replaceAll(RegExp(r'<[^>]*>'), '').trim(),
+                      style: AppTypography.ralewayLight(
+                        fontSize: 11,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ],

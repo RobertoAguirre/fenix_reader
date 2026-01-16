@@ -10,7 +10,7 @@ class AppConstants {
   // Labels
   static const String login = 'Iniciar Sesión';
   static const String access = 'Acceder';
-  static const String emailHint = 'Nombre o correo de usuario';
+  static const String emailHint = 'Correo electrónico';
   static const String passwordHint = 'Contraseña';
   static const String noAccount = '¿No tienes una cuenta?';
   static const String registerNow = 'Regístrate ahora';
@@ -28,7 +28,9 @@ class AppConstants {
   static const String myContent = 'Mi contenido';
   static const String favorites = 'Mis Favoritas';
   static const String home = 'INICIO';
-  static const String hypnosisFenix = 'HIPNOSIS FENIX';
-  static const String meditationsFenix = 'MEDITACIONES FENIX';
+  static const String hypnosisFenix = 'HIPNOSIS FÉNIX';
+  static const String meditationsFenix = 'MEDITACIONES FÉNIX';
+  static const String programasFenix = 'PROGRAMAS FÉNIX';
+  static const String thetaFenix = 'THETAFENIX';
 }
 

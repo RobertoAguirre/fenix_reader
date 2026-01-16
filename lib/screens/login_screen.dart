@@ -30,6 +30,197 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Limpia HTML y simplifica mensajes de error del backend
+  String _cleanErrorMessage(String? rawError) {
+    if (rawError == null || rawError.isEmpty) {
+      return 'Error al iniciar sesión';
+    }
+
+    // Remover todas las etiquetas HTML
+    String cleaned = rawError.replaceAll(RegExp(r'<[^>]*>'), '');
+    
+    // Remover URLs completas
+    cleaned = cleaned.replaceAll(RegExp(r'https?://[^\s]+'), '');
+    
+    // Limpiar espacios múltiples
+    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    // Detectar y simplificar mensajes comunes
+    final lowerError = cleaned.toLowerCase();
+    
+    if (lowerError.contains('contraseña') && lowerError.contains('no es correcta')) {
+      return 'La contraseña es incorrecta';
+    }
+    
+    if (lowerError.contains('contraseña') && lowerError.contains('incorrecta')) {
+      return 'La contraseña es incorrecta';
+    }
+    
+    if (lowerError.contains('usuario') && lowerError.contains('incorrecto')) {
+      return 'Correo o contraseña incorrectos';
+    }
+    
+    if (lowerError.contains('correo') && lowerError.contains('incorrecto')) {
+      return 'Correo o contraseña incorrectos';
+    }
+    
+    if (lowerError.contains('has olvidado') || lowerError.contains('olvidado tu contraseña')) {
+      return 'La contraseña es incorrecta';
+    }
+    
+    if (lowerError.contains('no existe') || lowerError.contains('no encontrado')) {
+      return 'No existe una cuenta con ese correo';
+    }
+    
+    if (lowerError.contains('nombre de usuario') && lowerError.contains('registrado')) {
+      return 'No existe una cuenta con ese correo';
+    }
+    
+    if (lowerError.contains('usuario') && lowerError.contains('registrado')) {
+      return 'No existe una cuenta con ese correo';
+    }
+    
+    // Si el mensaje limpio es muy largo, tomar solo la primera parte
+    if (cleaned.length > 100) {
+      final firstSentence = cleaned.split('.').first;
+      return firstSentence.isNotEmpty ? '$firstSentence.' : 'Error al iniciar sesión';
+    }
+
+    return cleaned.isNotEmpty ? cleaned : 'Error al iniciar sesión';
+  }
+
+  void _showPrivacyPolicyModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: AppColors.origen,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Barra superior
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.raizSagrada,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Política de Privacidad',
+                    style: AppTypography.kaushanTitle(
+                      fontSize: 20,
+                      color: AppColors.raizSagrada,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.raizSagrada,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // Contenido scrolleable
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Política de Privacidad App Fénix',
+                      style: AppTypography.kaushanTitle(
+                        fontSize: 22,
+                        color: AppColors.raizSagrada,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildPrivacyItem(
+                      'Recopilación de Información',
+                      'Recopilamos información que nos proporcionas directamente, como tu correo electrónico y nombre cuando creas una cuenta o te comunicas con nosotros.',
+                    ),
+                    _buildPrivacyItem(
+                      'Uso de la Información',
+                      'Utilizamos tu información para proporcionarte acceso a tu contenido personalizado, mejorar nuestros servicios y comunicarnos contigo sobre tu cuenta.',
+                    ),
+                    _buildPrivacyItem(
+                      'Protección de Datos',
+                      'Implementamos medidas de seguridad técnicas y organizativas para proteger tu información personal contra acceso no autorizado, pérdida o destrucción.',
+                    ),
+                    _buildPrivacyItem(
+                      'Almacenamiento',
+                      'Tu información se almacena de forma segura en nuestros servidores. Utilizamos almacenamiento seguro encriptado para proteger tus credenciales de acceso.',
+                    ),
+                    _buildPrivacyItem(
+                      'Derechos del Usuario',
+                      'Tienes derecho a acceder, rectificar, eliminar o portar tus datos personales. Puedes ejercer estos derechos contactándonos a través de los canales de soporte.',
+                    ),
+                    _buildPrivacyItem(
+                      'Cookies y Tecnologías Similares',
+                      'Esta aplicación utiliza tecnologías de almacenamiento local para mantener tu sesión activa y mejorar tu experiencia. No compartimos esta información con terceros.',
+                    ),
+                    _buildPrivacyItem(
+                      'Cambios en la Política',
+                      'Nos reservamos el derecho de actualizar esta política de privacidad. Te notificaremos sobre cambios significativos a través de la aplicación o por correo electrónico.',
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Última actualización: ${DateTime.now().year}',
+                      style: AppTypography.ralewayLight(
+                        fontSize: 12,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrivacyItem(String title, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: AppTypography.ralewayBold(
+              fontSize: 16,
+              color: AppColors.raizSagrada,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            text,
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ).copyWith(height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _handleLogin() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
@@ -77,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
       debugPrint('❌ Login falló: ${authProvider.error}');
       setState(() {
         _isLoading = false;
-        _errorMessage = authProvider.error ?? 'Error al iniciar sesión';
+        _errorMessage = _cleanErrorMessage(authProvider.error);
       });
     }
   }
@@ -220,59 +411,46 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               // Mensaje de error
               if (_errorMessage != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _errorMessage!,
-                  style: AppTypography.ralewayRegular(
-                    fontSize: 13,
-                    color: AppColors.error,
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.error.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-              const SizedBox(height: 20),
-              // Link registro
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    AppConstants.noAccount,
+                  child: Text(
+                    _errorMessage!,
                     style: AppTypography.ralewayRegular(
                       fontSize: 13,
-                      color: AppColors.raizSagrada,
+                      color: AppColors.error,
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  GestureDetector(
-                    onTap: () {
-                      // TODO: Abrir enlace de registro en Safari
-                    },
-                    child: Text(
-                      AppConstants.registerNow,
-                      style: AppTypography.ralewayBold(
-                        fontSize: 13,
-                        color: AppColors.raizSagrada,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 100),
-              // Política de privacidad
-              GestureDetector(
-                onTap: () {
-                  // TODO: Abrir política de privacidad en Safari
-                },
-                child: Text(
-                  AppConstants.privacyPolicy,
-                  style: AppTypography.ralewayLight(
-                    fontSize: 12,
-                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+              ],
             ],
+          ),
+        ),
+        // Política de privacidad - Casi al fondo
+        Positioned(
+          bottom: 30,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: GestureDetector(
+              onTap: () => _showPrivacyPolicyModal(context),
+              child: Text(
+                AppConstants.privacyPolicy,
+                style: AppTypography.ralewayLight(
+                  fontSize: 12,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                ),
+              ),
+            ),
           ),
         ),
       ],

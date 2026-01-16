@@ -442,6 +442,109 @@ class WordPressService {
     }
   }
 
+  /// Obtener programas comprados del usuario
+  Future<List<Map<String, dynamic>>> getUserPrograms(String email, {bool forceRefresh = false}) async {
+    try {
+      debugPrint('📚 Obteniendo programas comprados del usuario: $email');
+      
+      // Obtener todos los programas disponibles
+      final allPrograms = await getTutorCourses(forceRefresh: forceRefresh);
+      
+      if (allPrograms.isEmpty) {
+        debugPrint('⚠️ No hay programas disponibles');
+        return [];
+      }
+      
+      debugPrint('📚 Programas disponibles: ${allPrograms.length}');
+      
+      // Verificar cuáles tiene comprados el usuario
+      final purchasedPrograms = <Map<String, dynamic>>[];
+      
+      for (final program in allPrograms) {
+        final courseId = program['ID'] as int? ?? program['id'] as int?;
+        if (courseId == null) continue;
+        
+        final isEnrolled = await checkUserEnrollment(email, courseId, forceRefresh: forceRefresh);
+        
+        if (isEnrolled) {
+          purchasedPrograms.add(program);
+          debugPrint('✅ Usuario tiene acceso a: ${program['post_title'] ?? program['title']}');
+          
+          // TEMPORAL: Obtener detalles del primer programa para extraer link de Vimeo
+          if (purchasedPrograms.length == 1) {
+            try {
+              final details = await getTutorCourseDetails(courseId);
+              if (details != null) {
+                debugPrint('🔍 Analizando detalles del programa para encontrar video de Vimeo...');
+                
+                // Buscar vimeo_embed_code en topics y lessons
+                final topics = details['topics'] as List<dynamic>? ?? [];
+                debugPrint('📋 Topics encontrados: ${topics.length}');
+                
+                for (final topic in topics) {
+                  final topicMap = topic as Map<String, dynamic>;
+                  final lessons = topicMap['lessons'];
+                  
+                  if (lessons != null) {
+                    List<dynamic> lessonsList = [];
+                    if (lessons is Map && lessons['data'] != null) {
+                      lessonsList = lessons['data'] as List<dynamic>? ?? [];
+                    } else if (lessons is List) {
+                      lessonsList = lessons;
+                    }
+                    
+                    debugPrint('📚 Lessons en topic "${topicMap['post_title']}": ${lessonsList.length}');
+                    
+                    for (final lesson in lessonsList) {
+                      final lessonMap = lesson as Map<String, dynamic>;
+                      final vimeoCode = lessonMap['vimeo_embed_code'] as String? ?? 
+                                       lessonMap['embed_code'] as String?;
+                      
+                      if (vimeoCode != null && vimeoCode.isNotEmpty) {
+                        debugPrint('');
+                        debugPrint('═══════════════════════════════════════════');
+                        debugPrint('🎥 LINK DE VIMEO ENCONTRADO:');
+                        debugPrint('═══════════════════════════════════════════');
+                        debugPrint('Título del programa: ${program['post_title'] ?? program['title']}');
+                        debugPrint('Topic: ${topicMap['post_title']}');
+                        debugPrint('Lesson: ${lessonMap['post_title']}');
+                        debugPrint('Vimeo Embed Code: $vimeoCode');
+                        debugPrint('═══════════════════════════════════════════');
+                        debugPrint('');
+                        
+                        // Extraer ID de Vimeo si es posible
+                        final vimeoIdMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(vimeoCode);
+                        final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(vimeoCode);
+                        final idMatch = vimeoIdMatch ?? playerMatch;
+                        
+                        if (idMatch != null) {
+                          final videoId = idMatch.group(1);
+                          debugPrint('🎬 ID de Vimeo extraído: $videoId');
+                          debugPrint('🔗 URL directa: https://vimeo.com/$videoId');
+                          debugPrint('🔗 URL player: https://player.vimeo.com/video/$videoId');
+                        }
+                        debugPrint('');
+                        break; // Solo mostrar el primero encontrado
+                      }
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error obteniendo detalles para debug: $e');
+            }
+          }
+        }
+      }
+      
+      debugPrint('✅ Programas comprados del usuario: ${purchasedPrograms.length}');
+      return purchasedPrograms;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo programas del usuario: $e');
+      return [];
+    }
+  }
+
   /// Verificar si el usuario está inscrito en un curso
   Future<bool> checkUserEnrollment(String email, int courseId, {bool forceRefresh = false}) async {
     // Verificar caché si no se fuerza refresh
@@ -483,26 +586,6 @@ class WordPressService {
   // ENDPOINTS DE SERVICIOS
   // ============================================
 
-  /// Obtener sesiones ThetaFenix
-  Future<List<Map<String, dynamic>>> getThetaFenixSessions() async {
-    try {
-      final response = await _retryWithBackoff(() async {
-        return await http.get(
-          Uri.parse('$baseUrl/theta-sessions'),
-          headers: _defaultHeaders,
-        ).timeout(normalTimeout);
-      });
-
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        return decoded is List ? List<Map<String, dynamic>>.from(decoded) : [];
-      }
-      return [];
-    } catch (e) {
-      debugPrint('❌ Error obteniendo sesiones Theta: $e');
-      return [];
-    }
-  }
 
   /// Obtener contenido de sanación
   Future<Map<String, dynamic>?> getSanacionContent({String? slug}) async {
@@ -594,6 +677,122 @@ class WordPressService {
       debugPrint('❌ Error verificando acceso a programa: $e');
       return false;
     }
+  }
+
+  /// Obtener sesiones de THETAFENIX
+  Future<Map<String, dynamic>> getThetaFenixSessions() async {
+    try {
+      final response = await _retryWithBackoff(() async {
+        return await http.get(
+          Uri.parse('$wpBaseUrl/pages?search=thetahealing'),
+          headers: _defaultHeaders,
+        ).timeout(slowTimeout);
+      });
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final pages = decoded is List ? List<Map<String, dynamic>>.from(decoded) : [];
+        
+        // Buscar la página de ThetaFénix Grupal
+        final thetaFenixPage = pages.firstWhere(
+          (page) {
+            final title = page['title']?['rendered'] as String? ?? '';
+            final slug = page['slug'] as String? ?? '';
+            return title.toLowerCase().contains('thetafénix grupal') ||
+                   title.toLowerCase().contains('thetafenix grupal') ||
+                   slug.toLowerCase().contains('thetahealing');
+          },
+          orElse: () => <String, dynamic>{},
+        );
+
+        if (thetaFenixPage.isEmpty) {
+          debugPrint('⚠️ Página de ThetaFénix no encontrada');
+          return {
+            'pageInfo': null,
+            'sessions': <Map<String, dynamic>>[],
+          };
+        }
+
+        // Parsear sesiones del HTML
+        final content = thetaFenixPage['content']?['rendered'] as String? ?? '';
+        final sessions = _parseSessionsFromHTML(content);
+
+        return {
+          'pageInfo': {
+            'title': thetaFenixPage['title']?['rendered'] as String? ?? '',
+            'description': thetaFenixPage['excerpt']?['rendered'] as String? ?? '',
+          },
+          'sessions': sessions,
+        };
+      }
+      return {
+        'pageInfo': null,
+        'sessions': <Map<String, dynamic>>[],
+      };
+    } catch (e) {
+      debugPrint('❌ Error obteniendo sesiones de THETAFENIX: $e');
+      return {
+        'pageInfo': null,
+        'sessions': <Map<String, dynamic>>[],
+      };
+    }
+  }
+
+  /// Parsear sesiones del HTML
+  List<Map<String, dynamic>> _parseSessionsFromHTML(String htmlContent) {
+    final sessions = <Map<String, dynamic>>[];
+    
+    // Regex para encontrar fechas y enlaces (solo para extraer fechas, no usamos los enlaces)
+    final sessionRegex = RegExp(
+      r'<h3[^>]*class="[^"]*elementor-heading-title[^"]*"[^>]*>([^<]+)</h3>',
+      multiLine: true,
+      dotAll: true,
+    );
+    
+    final matches = sessionRegex.allMatches(htmlContent);
+    
+    for (final match in matches) {
+      final dateText = match.group(1)?.trim() ?? '';
+      
+      // Parsear la fecha
+      final dateMatch = RegExp(r'([A-Za-záéíóúñÁÉÍÓÚÑ]+)\s+(\d+)\s+([A-Za-záéíóúñÁÉÍÓÚÑ]+)').firstMatch(dateText);
+      if (dateMatch != null) {
+        final dayName = dateMatch.group(1) ?? '';
+        final day = int.tryParse(dateMatch.group(2) ?? '') ?? 0;
+        final month = dateMatch.group(3) ?? '';
+        final year = 2025; // Año actual
+        
+        sessions.add({
+          'id': 'session-${sessions.length + 1}',
+          'date': '$day $month $year',
+          'dayName': dayName,
+          'day': day,
+          'month': month,
+          'year': year,
+          'time': '8:30 PM CDMX',
+          'duration': '1.5 hrs',
+          'modality': 'Online por Zoom',
+        });
+      }
+    }
+    
+    // Ordenar sesiones por fecha
+    final months = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    
+    sessions.sort((a, b) {
+      final aMonthIndex = months.indexOf(a['month'] as String);
+      final bMonthIndex = months.indexOf(b['month'] as String);
+      
+      if (aMonthIndex != bMonthIndex) {
+        return aMonthIndex.compareTo(bMonthIndex);
+      }
+      return (a['day'] as int).compareTo(b['day'] as int);
+    });
+    
+    return sessions;
   }
 }
 
