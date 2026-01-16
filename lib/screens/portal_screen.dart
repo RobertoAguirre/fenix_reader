@@ -33,6 +33,8 @@ class _PortalScreenState extends State<PortalScreen> {
     AppConstants.programasFenix,
     AppConstants.thetaFenix,
     AppConstants.consultaExpres,
+    AppConstants.sesionFenix,
+    AppConstants.sesionFenixNinos,
   ];
   
   // Estado para THETAFENIX
@@ -235,6 +237,10 @@ class _PortalScreenState extends State<PortalScreen> {
                 _buildThetaFenixContent()
               else if (_selectedTab == 5)
                 _buildConsultaExpresContent()
+              else if (_selectedTab == 6)
+                _buildSesionFenixContent()
+              else if (_selectedTab == 7)
+                _buildSesionFenixNinosContent()
               else if (items.isEmpty)
                 _buildEmptyState()
               else
@@ -260,6 +266,10 @@ class _PortalScreenState extends State<PortalScreen> {
       case 4: // THETAFENIX - Se maneja separadamente
         return [];
       case 5: // CONSULTA EXPRÉS - Se maneja separadamente
+        return [];
+      case 6: // SESIÓN FÉNIX - Se maneja separadamente
+        return [];
+      case 7: // SESIÓN FÉNIX NIÑOS - Se maneja separadamente
         return [];
       default:
         return provider.all;
@@ -437,6 +447,10 @@ class _PortalScreenState extends State<PortalScreen> {
             tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
           } else if (index == 5) {
             tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
+          } else if (index == 6) {
+            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
+          } else if (index == 7) {
+            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX NIÑOS: verde oliva
           } else {
             tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
           }
@@ -510,6 +524,12 @@ class _PortalScreenState extends State<PortalScreen> {
         break;
       case 5:
         message = 'Consulta exprés disponible';
+        break;
+      case 6:
+        message = 'Sesión Fénix disponible';
+        break;
+      case 7:
+        message = 'Sesión Fénix Niños disponible';
         break;
       default:
         message = 'Tu biblioteca está vacía';
@@ -1534,6 +1554,470 @@ class _PortalScreenState extends State<PortalScreen> {
       context: context,
       audioUrl: audioUrl,
       title: item.title,
+    );
+  }
+
+  /// Construir contenido de SESIÓN FÉNIX
+  Widget _buildSesionFenixContent() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            '¿Qué pasaría si dejaras de sobrevivir y empezaras a vivir?',
+            style: AppTypography.kaushanTitle(
+              fontSize: 20,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Video promocional
+          _SesionFenixVideoPlayer(videoUrl: AppConstants.sesionFenixVideoUrl),
+          const SizedBox(height: 20),
+          
+          // Descripción
+          Text(
+            'La transformación no duele.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Resistirse, sí.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Información de la sesión
+          Text(
+            'Modalidad Online',
+            style: AppTypography.ralewayBold(
+              fontSize: 16,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Para personas mayores de 12 años',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Construir contenido de SESIÓN FÉNIX NIÑOS
+  Widget _buildSesionFenixNinosContent() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Alinearse y liberar desde pequeños nunca fué tan fácil.',
+            style: AppTypography.kaushanTitle(
+              fontSize: 20,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Video promocional
+          _SesionFenixNinosVideoPlayer(videoUrl: AppConstants.sesionFenixNinosVideoUrl),
+          const SizedBox(height: 20),
+          
+          // Descripción
+          Text(
+            'Confía.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sanar es posible, incluso en los más pequeños.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Información de la sesión
+          Text(
+            'Modalidad Online',
+            style: AppTypography.ralewayBold(
+              fontSize: 16,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Para niños menores de 12 años',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Widget para reproducir video de YouTube de forma nativa (SESIÓN FÉNIX)
+class _SesionFenixVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _SesionFenixVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_SesionFenixVideoPlayer> createState() => _SesionFenixVideoPlayerState();
+}
+
+class _SesionFenixVideoPlayerState extends State<_SesionFenixVideoPlayer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Forzar orientación portrait
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      // Extraer ID del video de YouTube de la URL embebida
+      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
+      if (videoIdMatch == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final videoId = videoIdMatch.group(1)!;
+      
+      // Usar YoutubeExplode para obtener la URL directa del video
+      final yt = YoutubeExplode();
+      final manifest = await yt.videos.streams.getManifest(videoId);
+      
+      // Obtener el stream de mejor calidad disponible
+      VideoStreamInfo? streamInfo;
+      
+      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
+      if (manifest.muxed.isNotEmpty) {
+        // Tomar el último stream muxed (suele ser el de mayor calidad)
+        streamInfo = manifest.muxed.last;
+      } else if (manifest.videoOnly.isNotEmpty) {
+        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
+        streamInfo = manifest.videoOnly.last;
+      }
+      
+      if (streamInfo == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        yt.close();
+        return;
+      }
+
+      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
+      _controller = VideoPlayerController.networkUrl(streamInfo.url);
+
+      await _controller!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _controller!,
+        autoPlay: false,
+        looping: false,
+        aspectRatio: _controller!.value.aspectRatio,
+        showControls: true,
+        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
+        allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              'Error al cargar el video',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          );
+        },
+      );
+
+      yt.close();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error cargando video de YouTube: $e');
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restaurar todas las orientaciones permitidas
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _chewieController?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 225,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.raizSagrada.withValues(alpha: 0.1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.ascenso,
+                ),
+              )
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar el video',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const SizedBox.shrink(),
+      ),
+    );
+  }
+}
+
+/// Widget para reproducir video de YouTube de forma nativa (SESIÓN FÉNIX NIÑOS)
+class _SesionFenixNinosVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _SesionFenixNinosVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_SesionFenixNinosVideoPlayer> createState() => _SesionFenixNinosVideoPlayerState();
+}
+
+class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlayer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Forzar orientación portrait
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      // Extraer ID del video de YouTube de la URL embebida
+      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
+      if (videoIdMatch == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final videoId = videoIdMatch.group(1)!;
+      
+      // Usar YoutubeExplode para obtener la URL directa del video
+      final yt = YoutubeExplode();
+      final manifest = await yt.videos.streams.getManifest(videoId);
+      
+      // Obtener el stream de mejor calidad disponible
+      VideoStreamInfo? streamInfo;
+      
+      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
+      if (manifest.muxed.isNotEmpty) {
+        // Tomar el último stream muxed (suele ser el de mayor calidad)
+        streamInfo = manifest.muxed.last;
+      } else if (manifest.videoOnly.isNotEmpty) {
+        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
+        streamInfo = manifest.videoOnly.last;
+      }
+      
+      if (streamInfo == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        yt.close();
+        return;
+      }
+
+      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
+      _controller = VideoPlayerController.networkUrl(streamInfo.url);
+
+      await _controller!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _controller!,
+        autoPlay: false,
+        looping: false,
+        aspectRatio: _controller!.value.aspectRatio,
+        showControls: true,
+        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
+        allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              'Error al cargar el video',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          );
+        },
+      );
+
+      yt.close();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error cargando video de YouTube: $e');
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restaurar todas las orientaciones permitidas
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _chewieController?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 225,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.raizSagrada.withValues(alpha: 0.1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.ascenso,
+                ),
+              )
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar el video',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const SizedBox.shrink(),
+      ),
     );
   }
 }
