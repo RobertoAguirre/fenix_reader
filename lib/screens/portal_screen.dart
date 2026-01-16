@@ -1404,27 +1404,40 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 24),
           
-          // Botón para solicitar consulta
+          // Botón de apoyo de emergencia
           Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppConsulta,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Solicitar consulta exprés',
-                  style: AppTypography.ralewayBold(
-                    fontSize: 14,
-                    color: AppColors.white,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _openWhatsAppConsulta,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.ascenso,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Apoyo de emergencia',
+                      style: AppTypography.ralewayBold(
+                        fontSize: 14,
+                        color: AppColors.white,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  'Soporte oportuno disponible',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 12,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ],
@@ -1432,7 +1445,7 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Abrir WhatsApp para solicitar consulta
+  /// Abrir WhatsApp para contactar
   Future<void> _openWhatsAppConsulta() async {
     try {
       final message = Uri.encodeComponent(AppConstants.whatsappConsultaMessage);

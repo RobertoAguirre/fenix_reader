@@ -40,6 +40,6 @@ class AppConstants {
   
   // WhatsApp
   static const String whatsappNumber = '5216141847863';
-  static const String whatsappConsultaMessage = '¡Hola! Me gustaría solicitar una consulta exprés.\n¡Gracias!👋';
+  static const String whatsappConsultaMessage = '¡Hola! Me gustaría obtener más información.\n¡Gracias!👋';
 }
 
