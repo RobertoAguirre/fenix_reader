@@ -32,5 +32,8 @@ class AppConstants {
   static const String meditationsFenix = 'MEDITACIONES FÉNIX';
   static const String programasFenix = 'PROGRAMAS FÉNIX';
   static const String thetaFenix = 'THETAFENIX';
+  
+  // URLs de contenido
+  static const String thetaFenixVideoUrl = 'https://www.youtube.com/embed/z85tZKc2ow0?si=NNqks4i5qJ3CMnES';
 }
 

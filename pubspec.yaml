@@ -22,6 +22,7 @@ dependencies:
   # Video
   video_player: ^2.10.0
   chewie: ^1.7.0
+  youtube_explode_dart: ^2.0.0
   
   # Audio
   audioplayers: ^5.2.0

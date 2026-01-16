@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
@@ -1276,24 +1280,8 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Video de YouTube (hardcodeado como en FenixRn)
-          Container(
-            width: double.infinity,
-            height: 225,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: AppColors.raizSagrada.withValues(alpha: 0.1),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: const Center(
-                child: Text(
-                  'Video promocional',
-                  style: TextStyle(color: AppColors.raizSagrada),
-                ),
-              ),
-            ),
-          ),
+          // Video de YouTube promocional
+          _buildThetaFenixVideo(),
           const SizedBox(height: 20),
           
           // Información de la sesión
@@ -1367,6 +1355,11 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
+  /// Construir widget de video de YouTube para THETAFENIX
+  Widget _buildThetaFenixVideo() {
+    return _ThetaFenixVideoPlayer(videoUrl: AppConstants.thetaFenixVideoUrl);
+  }
+
   /// Formatear fecha de THETAFENIX
   String _formatThetaDate(String dateString) {
     final months = {
@@ -1424,6 +1417,174 @@ class _PortalScreenState extends State<PortalScreen> {
       context: context,
       audioUrl: audioUrl,
       title: item.title,
+    );
+  }
+}
+
+/// Widget para reproducir video de YouTube de forma nativa
+class _ThetaFenixVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _ThetaFenixVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_ThetaFenixVideoPlayer> createState() => _ThetaFenixVideoPlayerState();
+}
+
+class _ThetaFenixVideoPlayerState extends State<_ThetaFenixVideoPlayer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Forzar orientación portrait
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      // Extraer ID del video de YouTube de la URL embebida
+      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
+      if (videoIdMatch == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final videoId = videoIdMatch.group(1)!;
+      
+      // Usar YoutubeExplode para obtener la URL directa del video
+      final yt = YoutubeExplode();
+      final manifest = await yt.videos.streams.getManifest(videoId);
+      
+      // Obtener el stream de mejor calidad disponible
+      // Muxed tiene audio+video pero limitado a 360p, videoOnly puede tener mejor calidad
+      VideoStreamInfo? streamInfo;
+      
+      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
+      if (manifest.muxed.isNotEmpty) {
+        // Tomar el último stream muxed (suele ser el de mayor calidad)
+        streamInfo = manifest.muxed.last;
+      } else if (manifest.videoOnly.isNotEmpty) {
+        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
+        streamInfo = manifest.videoOnly.last;
+      }
+      
+      if (streamInfo == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        yt.close();
+        return;
+      }
+
+      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
+      _controller = VideoPlayerController.networkUrl(streamInfo.url);
+
+      await _controller!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _controller!,
+        autoPlay: false,
+        looping: false,
+        aspectRatio: _controller!.value.aspectRatio,
+        showControls: true,
+        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
+        allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              'Error al cargar el video',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          );
+        },
+      );
+
+      yt.close();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error cargando video de YouTube: $e');
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restaurar todas las orientaciones permitidas
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _chewieController?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 225,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.raizSagrada.withValues(alpha: 0.1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.ascenso,
+                ),
+              )
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar el video',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const SizedBox.shrink(),
+      ),
     );
   }
 }
