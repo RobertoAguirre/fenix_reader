@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
@@ -31,6 +32,7 @@ class _PortalScreenState extends State<PortalScreen> {
     AppConstants.meditationsFenix,
     AppConstants.programasFenix,
     AppConstants.thetaFenix,
+    AppConstants.consultaExpres,
   ];
   
   // Estado para THETAFENIX
@@ -231,6 +233,8 @@ class _PortalScreenState extends State<PortalScreen> {
                 _buildProgramsList(provider.programs)
               else if (_selectedTab == 4)
                 _buildThetaFenixContent()
+              else if (_selectedTab == 5)
+                _buildConsultaExpresContent()
               else if (items.isEmpty)
                 _buildEmptyState()
               else
@@ -254,6 +258,8 @@ class _PortalScreenState extends State<PortalScreen> {
       case 3: // PROGRAMAS FÉNIX - Se maneja separadamente
         return [];
       case 4: // THETAFENIX - Se maneja separadamente
+        return [];
+      case 5: // CONSULTA EXPRÉS - Se maneja separadamente
         return [];
       default:
         return provider.all;
@@ -429,6 +435,8 @@ class _PortalScreenState extends State<PortalScreen> {
             tabColor = AppColors.expansionAlquimica; // MEDITACIONES: verde oliva
           } else if (index == 4) {
             tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
+          } else if (index == 5) {
+            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
           } else {
             tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
           }
@@ -499,6 +507,9 @@ class _PortalScreenState extends State<PortalScreen> {
         break;
       case 4:
         message = 'No hay sesiones disponibles en este momento';
+        break;
+      case 5:
+        message = 'Consulta exprés disponible';
         break;
       default:
         message = 'Tu biblioteca está vacía';
@@ -1360,6 +1371,99 @@ class _PortalScreenState extends State<PortalScreen> {
     return _ThetaFenixVideoPlayer(videoUrl: AppConstants.thetaFenixVideoUrl);
   }
 
+  /// Construir contenido de CONSULTA EXPRÉS
+  Widget _buildConsultaExpresContent() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Un espacio seguro y profesional, justo cuando más lo necesitas.',
+            style: AppTypography.kaushanTitle(
+              fontSize: 20,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Video promocional
+          _ConsultaExpresVideoPlayer(videoUrl: AppConstants.consultaExpresVideoUrl),
+          const SizedBox(height: 20),
+          
+          // Descripción
+          Text(
+            'Aquí no estás solx: estoy para escucharte, guiarte y darte claridad para recuperar tu equilibrio.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          
+          // Botón para solicitar consulta
+          Center(
+            child: GestureDetector(
+              onTap: _openWhatsAppConsulta,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Solicitar consulta exprés',
+                  style: AppTypography.ralewayBold(
+                    fontSize: 14,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Abrir WhatsApp para solicitar consulta
+  Future<void> _openWhatsAppConsulta() async {
+    try {
+      final message = Uri.encodeComponent(AppConstants.whatsappConsultaMessage);
+      final whatsappUrl = 'https://api.whatsapp.com/send?phone=${AppConstants.whatsappNumber}&text=$message';
+      final uri = Uri.parse(whatsappUrl);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error abriendo WhatsApp: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al abrir WhatsApp'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   /// Formatear fecha de THETAFENIX
   String _formatThetaDate(String dateString) {
     final months = {
@@ -1417,6 +1521,173 @@ class _PortalScreenState extends State<PortalScreen> {
       context: context,
       audioUrl: audioUrl,
       title: item.title,
+    );
+  }
+}
+
+/// Widget para reproducir video de YouTube de forma nativa (CONSULTA EXPRÉS)
+class _ConsultaExpresVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+
+  const _ConsultaExpresVideoPlayer({required this.videoUrl});
+
+  @override
+  State<_ConsultaExpresVideoPlayer> createState() => _ConsultaExpresVideoPlayerState();
+}
+
+class _ConsultaExpresVideoPlayerState extends State<_ConsultaExpresVideoPlayer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Forzar orientación portrait
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      // Extraer ID del video de YouTube de la URL embebida
+      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
+      if (videoIdMatch == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final videoId = videoIdMatch.group(1)!;
+      
+      // Usar YoutubeExplode para obtener la URL directa del video
+      final yt = YoutubeExplode();
+      final manifest = await yt.videos.streams.getManifest(videoId);
+      
+      // Obtener el stream de mejor calidad disponible
+      VideoStreamInfo? streamInfo;
+      
+      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
+      if (manifest.muxed.isNotEmpty) {
+        // Tomar el último stream muxed (suele ser el de mayor calidad)
+        streamInfo = manifest.muxed.last;
+      } else if (manifest.videoOnly.isNotEmpty) {
+        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
+        streamInfo = manifest.videoOnly.last;
+      }
+      
+      if (streamInfo == null) {
+        setState(() {
+          _hasError = true;
+          _isLoading = false;
+        });
+        yt.close();
+        return;
+      }
+
+      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
+      _controller = VideoPlayerController.networkUrl(streamInfo.url);
+
+      await _controller!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _controller!,
+        autoPlay: false,
+        looping: false,
+        aspectRatio: _controller!.value.aspectRatio,
+        showControls: true,
+        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
+        allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              'Error al cargar el video',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          );
+        },
+      );
+
+      yt.close();
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error cargando video de YouTube: $e');
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restaurar todas las orientaciones permitidas
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _chewieController?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 225,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.raizSagrada.withValues(alpha: 0.1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.ascenso,
+                ),
+              )
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar el video',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const SizedBox.shrink(),
+      ),
     );
   }
 }

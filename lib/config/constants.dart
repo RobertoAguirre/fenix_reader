@@ -32,8 +32,14 @@ class AppConstants {
   static const String meditationsFenix = 'MEDITACIONES FÉNIX';
   static const String programasFenix = 'PROGRAMAS FÉNIX';
   static const String thetaFenix = 'THETAFENIX';
+  static const String consultaExpres = 'CONSULTA EXPRÉS';
   
   // URLs de contenido
   static const String thetaFenixVideoUrl = 'https://www.youtube.com/embed/z85tZKc2ow0?si=NNqks4i5qJ3CMnES';
+  static const String consultaExpresVideoUrl = 'https://www.youtube.com/embed/0BWecmtLow8?si=LaZAT2iP1BMSVcef';
+  
+  // WhatsApp
+  static const String whatsappNumber = '5216141847863';
+  static const String whatsappConsultaMessage = '¡Hola! Me gustaría solicitar una consulta exprés.\n¡Gracias!👋';
 }
 
