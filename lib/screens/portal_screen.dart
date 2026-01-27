@@ -59,6 +59,10 @@ class _PortalScreenState extends State<PortalScreen> {
   // Estado para MEDITACIONES FÉNIX
   final TextEditingController _meditationsSearchController = TextEditingController();
   bool _showMeditationsFavoritesOnly = false;
+  
+  // Estado para TAPPINGS
+  final TextEditingController _tappingsSearchController = TextEditingController();
+  bool _showTappingsFavoritesOnly = false;
 
   @override
   void initState() {
@@ -73,6 +77,7 @@ class _PortalScreenState extends State<PortalScreen> {
   void dispose() {
     _hypnosisSearchController.dispose();
     _meditationsSearchController.dispose();
+    _tappingsSearchController.dispose();
     super.dispose();
   }
 
@@ -238,7 +243,9 @@ class _PortalScreenState extends State<PortalScreen> {
                 child: Text(
                   _selectedTab == 1 
                       ? 'Hipnosis Fénix' 
-                      : (_selectedTab == 2 ? 'Meditaciones Fénix' : _tabs[_selectedTab]),
+                      : (_selectedTab == 2 
+                          ? 'Meditaciones Fénix' 
+                          : (_selectedTab == 3 ? 'Tappings' : _tabs[_selectedTab])),
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
@@ -257,7 +264,7 @@ class _PortalScreenState extends State<PortalScreen> {
               else if (_selectedTab == 2)
                 _buildMeditationsFenixContent(provider)
               else if (_selectedTab == 3)
-                _buildTappingsContent()
+                _buildTappingsContent(provider)
               else if (_selectedTab == 4)
                 _buildThetaFenixContent()
               else if (_selectedTab == 5)
@@ -2485,11 +2492,11 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   /// Construir contenido de TAPPINGS
-  Widget _buildTappingsContent() {
-    final provider = context.watch<ContentProvider>();
+  Widget _buildTappingsContent(ContentProvider provider) {
     final authProvider = context.watch<AuthProvider>();
-    final tappings = _getTappings(provider);
+    final allTappings = _getTappings(provider);
     final isLoading = provider.isLoading;
+    final filteredTappings = _getFilteredTappingsItems(allTappings);
 
     // Cargar contenido del usuario si no está cargado
     if (!isLoading && provider.content == null && authProvider.user?.email != null) {
@@ -2509,157 +2516,412 @@ class _PortalScreenState extends State<PortalScreen> {
       );
     }
 
-    if (tappings.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.video_library_outlined,
-                size: 64,
-                color: AppColors.raizSagrada.withValues(alpha: 0.3),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No tienes Tappings disponibles',
-                style: AppTypography.ralewayRegular(
-                  fontSize: 16,
-                  color: AppColors.raizSagrada.withValues(alpha: 0.6),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: tappings.length,
-        itemBuilder: (context, index) {
-          final tapping = tappings[index];
-          return _buildTappingCard(tapping);
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Calma tu sistema nervioso',
+            style: AppTypography.kaushanTitle(
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          
+          // Video promocional
+          _PortalesVideoPlayer(videoUrl: AppConstants.tappingsVideoUrl),
+          const SizedBox(height: 16),
+          
+          // Texto descriptivo
+          Text(
+            'Vuelve a la calma durante el día en 5 minutos mientras te reprogramas.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Buscador y filtro de favoritos
+          _buildTappingsSearchBar(),
+          const SizedBox(height: 8),
+          
+          // Grid de tappings
+          if (filteredTappings.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  _showTappingsFavoritesOnly 
+                      ? 'No tienes favoritos aún'
+                      : 'No se encontraron resultados',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            )
+          else
+            _buildTappingsGrid(filteredTappings),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
 
-  /// Construir card de Tapping individual
-  Widget _buildTappingCard(ContentItem tapping) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.raizSagrada.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Imagen destacada (si existe)
-          if (tapping.image != null && tapping.image!.isNotEmpty)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(
-                imageUrl: tapping.image!,
-                width: double.infinity,
-                height: 200,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  height: 200,
-                  color: AppColors.raizSagrada.withValues(alpha: 0.1),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.ascenso,
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 200,
-                  color: AppColors.raizSagrada.withValues(alpha: 0.1),
-                  child: Icon(
-                    Icons.video_library_outlined,
-                    size: 48,
-                    color: AppColors.raizSagrada.withValues(alpha: 0.3),
-                  ),
-                ),
+  /// Buscador y filtro de favoritos para Tappings
+  Widget _buildTappingsSearchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.raizSagrada.withValues(alpha: 0.2),
               ),
             ),
-          
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Título
-                Text(
-                  tapping.title,
-                  style: AppTypography.ralewayBold(
-                    fontSize: 18,
-                    color: AppColors.raizSagrada,
-                  ),
+            child: TextField(
+              controller: _tappingsSearchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar tappings...',
+                hintStyle: AppTypography.ralewayRegular(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
                 ),
-                const SizedBox(height: 12),
-                
-                // Descripción (si existe)
-                if (tapping.description != null && tapping.description!.isNotEmpty)
-                  Text(
-                    _cleanDescription(tapping.description!),
-                    style: AppTypography.ralewayRegular(
-                      fontSize: 14,
-                      color: AppColors.raizSagrada.withValues(alpha: 0.8),
-                    ),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                
-                const SizedBox(height: 16),
-                
-                // Reproductor de video
-                if (tapping.downloadUrl != null && tapping.downloadUrl!.isNotEmpty)
-                  _TappingVideoPlayer(
-                    videoUrl: tapping.downloadUrl!,
-                    title: tapping.title,
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.raizSagrada.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
-                          size: 20,
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _showTappingsFavoritesOnly = !_showTappingsFavoritesOnly;
+            });
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _showTappingsFavoritesOnly 
+                  ? AppColors.expansionAlquimica.withValues(alpha: 0.2)
+                  : AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _showTappingsFavoritesOnly
+                    ? AppColors.expansionAlquimica
+                    : AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '🤍',
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Filtrar items de tappings según búsqueda y favoritos
+  List<ContentItem> _getFilteredTappingsItems(List<ContentItem> items) {
+    var filtered = items;
+    
+    // Filtrar por búsqueda
+    final searchQuery = _tappingsSearchController.text.toLowerCase().trim();
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        return item.title.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+    
+    // Filtrar por favoritos
+    if (_showTappingsFavoritesOnly) {
+      filtered = filtered.where((item) {
+        return _favoriteIds.contains(item.id);
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  /// Grid de tappings con preview de video
+  Widget _buildTappingsGrid(List<ContentItem> items) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildTappingCard(item);
+      },
+    );
+  }
+
+  /// Card de tapping con preview de video
+  Widget _buildTappingCard(ContentItem tapping) {
+    final isFavorite = _favoriteIds.contains(tapping.id);
+    
+    return GestureDetector(
+      onTap: () => _showTappingModal(tapping),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.raizSagrada.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Preview del video (imagen o placeholder)
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Mostrar imagen si existe, sino placeholder de video
+                    tapping.image != null && tapping.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: tapping.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Color(0xFFB0E0E6),
+                                    Color(0xFF98D8C8),
+                                  ],
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildVideoPlaceholder(),
+                          )
+                        : _buildVideoPlaceholder(),
+                    // Overlay con icono de play
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      child: const Center(
+                        child: Icon(
+                          Icons.play_circle_filled,
+                          color: Colors.white,
+                          size: 48,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
+                      ),
+                    ),
+                    // Botón de favorito
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () async {
+                          await _favoritesService.toggleFavorite(tapping.id);
+                          await _loadFavorites();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                          ),
                           child: Text(
-                            'Video no disponible',
-                            style: AppTypography.ralewayRegular(
-                              fontSize: 14,
-                              color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                            isFavorite ? '🤍' : '🤍',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: isFavorite 
+                                  ? AppColors.expansionAlquimica
+                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
                             ),
                           ),
                         ),
-                      ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Título y descripción
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    tapping.title,
+                    style: AppTypography.ralewayBold(
+                      fontSize: 12,
+                      color: AppColors.raizSagrada,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (tapping.description != null && tapping.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _cleanDescription(tapping.description!),
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 10,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Placeholder para video cuando no hay imagen
+  Widget _buildVideoPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFB0E0E6),
+            Color(0xFF98D8C8),
+          ],
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.video_library,
+          color: Colors.white,
+          size: 48,
+        ),
+      ),
+    );
+  }
+
+  /// Mostrar modal con video completo de tapping
+  void _showTappingModal(ContentItem tapping) {
+    if (tapping.downloadUrl == null || tapping.downloadUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No hay video disponible para ${tapping.title}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: AppColors.origen,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Barra superior con botón cerrar
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      tapping.title,
+                      style: AppTypography.ralewayBold(
+                        fontSize: 18,
+                        color: AppColors.raizSagrada,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-              ],
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.raizSagrada,
+                    ),
+                    onPressed: () => Navigator.pop(modalContext),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            // Video player
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _TappingVideoPlayer(
+                  videoUrl: tapping.downloadUrl!,
+                  title: tapping.title,
+                ),
+              ),
+            ),
+            // Descripción si existe
+            if (tapping.description != null && tapping.description!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _cleanDescription(tapping.description!),
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.8),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }

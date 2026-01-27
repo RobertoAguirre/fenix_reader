@@ -43,8 +43,9 @@ class AppConstants {
   static const String sesionFenixVideoUrl = 'https://www.youtube.com/embed/NHoxAWPx-g0?si=e3rh33sTpFnVv35V';
   static const String sesionFenixNinosVideoUrl = 'https://www.youtube.com/embed/Y65ap8CIKQM?si=rFvP9_o-R2bACjQC';
   static const String portalesVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
-  static const String hypnosisFenixVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
+  static const String hypnosisFenixVideoUrl = 'https://vimeo.com/1116471096?share=copy&fl=sv&fe=ci';
   static const String meditationsFenixVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
+  static const String tappingsVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
   
   // WhatsApp
   static const String whatsappNumber = '5216141847863';
