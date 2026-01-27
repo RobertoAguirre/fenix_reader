@@ -55,6 +55,10 @@ class _PortalScreenState extends State<PortalScreen> {
   final FavoritesService _favoritesService = FavoritesService();
   Set<int> _favoriteIds = {};
   bool _showFavoritesOnly = false;
+  
+  // Estado para MEDITACIONES FÉNIX
+  final TextEditingController _meditationsSearchController = TextEditingController();
+  bool _showMeditationsFavoritesOnly = false;
 
   @override
   void initState() {
@@ -68,6 +72,7 @@ class _PortalScreenState extends State<PortalScreen> {
   @override
   void dispose() {
     _hypnosisSearchController.dispose();
+    _meditationsSearchController.dispose();
     super.dispose();
   }
 
@@ -231,7 +236,9 @@ class _PortalScreenState extends State<PortalScreen> {
               // Título de sección - Usa el título de la pestaña seleccionada
               Center(
                 child: Text(
-                  _selectedTab == 1 ? 'Hipnosis Fénix' : _tabs[_selectedTab],
+                  _selectedTab == 1 
+                      ? 'Hipnosis Fénix' 
+                      : (_selectedTab == 2 ? 'Meditaciones Fénix' : _tabs[_selectedTab]),
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
@@ -247,6 +254,8 @@ class _PortalScreenState extends State<PortalScreen> {
                 _buildPortalesContent()
               else if (_selectedTab == 1)
                 _buildHypnosisFenixContent(provider)
+              else if (_selectedTab == 2)
+                _buildMeditationsFenixContent(provider)
               else if (_selectedTab == 3)
                 _buildTappingsContent()
               else if (_selectedTab == 4)
@@ -1866,6 +1875,286 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Card de hipnosis con descripción y favoritos
   Widget _buildHypnosisCard(ContentItem item) {
+    final isFavorite = _favoriteIds.contains(item.id);
+    
+    return GestureDetector(
+      onTap: () => _showContentModal(item),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.raizSagrada.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Imagen - ocupa espacio disponible
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    item.image != null && item.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: item.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Color(0xFFB0E0E6),
+                                    Color(0xFF98D8C8),
+                                  ],
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildGradientFallback(item),
+                          )
+                        : _buildGradientFallback(item),
+                    // Botón de favorito
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () async {
+                          await _favoritesService.toggleFavorite(item.id);
+                          await _loadFavorites();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            isFavorite ? '🤍' : '🤍',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: isFavorite 
+                                  ? AppColors.expansionAlquimica
+                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Título - tamaño fijo
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                item.title,
+                style: AppTypography.ralewayBold(
+                  fontSize: 12,
+                  color: AppColors.raizSagrada,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Construir contenido de MEDITACIONES FÉNIX
+  Widget _buildMeditationsFenixContent(ContentProvider provider) {
+    final allItems = provider.meditations;
+    final filteredItems = _getFilteredMeditationsItems(allItems);
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Alinéate en pocos minutos',
+            style: AppTypography.kaushanTitle(
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          
+          // Video promocional
+          _PortalesVideoPlayer(videoUrl: AppConstants.meditationsFenixVideoUrl),
+          const SizedBox(height: 16),
+          
+          // Texto descriptivo
+          Text(
+            'Inicia tu día alineándote en pocos minutos.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Buscador y filtro de favoritos
+          _buildMeditationsSearchBar(),
+          const SizedBox(height: 8),
+          
+          // Grid de meditaciones
+          if (filteredItems.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  _showMeditationsFavoritesOnly 
+                      ? 'No tienes favoritos aún'
+                      : 'No se encontraron resultados',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            )
+          else
+            _buildMeditationsGrid(filteredItems),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Buscador y filtro de favoritos para Meditaciones
+  Widget _buildMeditationsSearchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: TextField(
+              controller: _meditationsSearchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar meditaciones...',
+                hintStyle: AppTypography.ralewayRegular(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _showMeditationsFavoritesOnly = !_showMeditationsFavoritesOnly;
+            });
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _showMeditationsFavoritesOnly 
+                  ? AppColors.expansionAlquimica.withValues(alpha: 0.2)
+                  : AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _showMeditationsFavoritesOnly
+                    ? AppColors.expansionAlquimica
+                    : AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '🤍',
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Filtrar items de meditaciones según búsqueda y favoritos
+  List<ContentItem> _getFilteredMeditationsItems(List<ContentItem> items) {
+    var filtered = items;
+    
+    // Filtrar por búsqueda
+    final searchQuery = _meditationsSearchController.text.toLowerCase().trim();
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        return item.title.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+    
+    // Filtrar por favoritos
+    if (_showMeditationsFavoritesOnly) {
+      filtered = filtered.where((item) {
+        return _favoriteIds.contains(item.id);
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  /// Grid de meditaciones con favoritos
+  Widget _buildMeditationsGrid(List<ContentItem> items) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildMeditationCard(item);
+      },
+    );
+  }
+
+  /// Card de meditación con favoritos
+  Widget _buildMeditationCard(ContentItem item) {
     final isFavorite = _favoriteIds.contains(item.id);
     
     return GestureDetector(
