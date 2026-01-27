@@ -21,6 +21,8 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
+import 'package:flutter_screenshot_blocker/flutter_screenshot_blocker.dart';
+import '../services/favorites_service.dart';
 
 /// Pantalla de Portales/Inicio con tabs
 class PortalScreen extends StatefulWidget {
@@ -47,12 +49,26 @@ class _PortalScreenState extends State<PortalScreen> {
   List<Map<String, dynamic>> _thetaFenixSessions = [];
   bool _isLoadingThetaFenix = false;
   Map<String, dynamic>? _thetaFenixPageInfo;
+  
+  // Estado para HIPNOSIS FÉNIX
+  final TextEditingController _hypnosisSearchController = TextEditingController();
+  final FavoritesService _favoritesService = FavoritesService();
+  Set<int> _favoriteIds = {};
+  bool _showFavoritesOnly = false;
 
   @override
   void initState() {
     super.initState();
     // Cargar programas cuando se monta el widget
     _loadProgramsIfNeeded();
+    // Cargar favoritos cuando se monta el widget
+    _loadFavorites();
+  }
+
+  @override
+  void dispose() {
+    _hypnosisSearchController.dispose();
+    super.dispose();
   }
 
   void _loadProgramsIfNeeded() {
@@ -215,7 +231,7 @@ class _PortalScreenState extends State<PortalScreen> {
               // Título de sección - Usa el título de la pestaña seleccionada
               Center(
                 child: Text(
-                  _tabs[_selectedTab],
+                  _selectedTab == 1 ? 'Hipnosis Fénix' : _tabs[_selectedTab],
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
@@ -229,6 +245,8 @@ class _PortalScreenState extends State<PortalScreen> {
                 _buildLoading()
               else if (_selectedTab == 0)
                 _buildPortalesContent()
+              else if (_selectedTab == 1)
+                _buildHypnosisFenixContent(provider)
               else if (_selectedTab == 3)
                 _buildTappingsContent()
               else if (_selectedTab == 4)
@@ -1623,6 +1641,332 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
+  /// Construir contenido de HIPNOSIS FÉNIX
+  Widget _buildHypnosisFenixContent(ContentProvider provider) {
+    final allItems = provider.hypnosis;
+    final filteredItems = _getFilteredHypnosisItems(allItems);
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Activa tu frecuencia',
+            style: AppTypography.kaushanTitle(
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          
+          // Video promocional
+          _PortalesVideoPlayer(videoUrl: AppConstants.hypnosisFenixVideoUrl),
+          const SizedBox(height: 16),
+          
+          // Texto descriptivo
+          Text(
+            'Se reproduce con audífonos si duermes acompañadx y te duermes con ella.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Buscador y filtro de favoritos
+          _buildHypnosisSearchBar(),
+          const SizedBox(height: 8),
+          
+          // Grid de hipnosis
+          if (filteredItems.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  _showFavoritesOnly 
+                      ? 'No tienes favoritos aún'
+                      : 'No se encontraron resultados',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            )
+          else
+            _buildHypnosisGrid(filteredItems),
+          const SizedBox(height: 24),
+          
+          // Botón Apoyo Fénix
+          Center(
+            child: GestureDetector(
+              onTap: _openWhatsAppApoyo,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Apoyo Fénix',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 16,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Buscador y filtro de favoritos para Hipnosis
+  Widget _buildHypnosisSearchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: TextField(
+              controller: _hypnosisSearchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar hipnosis...',
+                hintStyle: AppTypography.ralewayRegular(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _showFavoritesOnly = !_showFavoritesOnly;
+            });
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _showFavoritesOnly 
+                  ? AppColors.expansionAlquimica.withValues(alpha: 0.2)
+                  : AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _showFavoritesOnly
+                    ? AppColors.expansionAlquimica
+                    : AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '🤍',
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Filtrar items de hipnosis según búsqueda y favoritos
+  List<ContentItem> _getFilteredHypnosisItems(List<ContentItem> items) {
+    var filtered = items;
+    
+    // Excluir tappings - solo mostrar hipnosis
+    filtered = filtered.where((item) {
+      final title = item.title.toLowerCase();
+      final category = item.type?.toString().toLowerCase() ?? '';
+      // Excluir si es tapping
+      if (category.contains('tapping') || 
+          title.contains('tapping') || 
+          title.contains('tappings')) {
+        return false;
+      }
+      return true;
+    }).toList();
+    
+    // Filtrar por búsqueda
+    final searchQuery = _hypnosisSearchController.text.toLowerCase().trim();
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        return item.title.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+    
+    // Filtrar por favoritos
+    if (_showFavoritesOnly) {
+      filtered = filtered.where((item) {
+        return _favoriteIds.contains(item.id);
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  /// Cargar favoritos
+  Future<void> _loadFavorites() async {
+    final favorites = await _favoritesService.getFavorites();
+    setState(() {
+      _favoriteIds = favorites.toSet();
+    });
+  }
+
+  /// Grid de hipnosis con favoritos y descripción
+  Widget _buildHypnosisGrid(List<ContentItem> items) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildHypnosisCard(item);
+      },
+    );
+  }
+
+  /// Card de hipnosis con descripción y favoritos
+  Widget _buildHypnosisCard(ContentItem item) {
+    final isFavorite = _favoriteIds.contains(item.id);
+    
+    return GestureDetector(
+      onTap: () => _showContentModal(item),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.raizSagrada.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Imagen - ocupa espacio disponible
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    item.image != null && item.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: item.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Color(0xFFB0E0E6),
+                                    Color(0xFF98D8C8),
+                                  ],
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildGradientFallback(item),
+                          )
+                        : _buildGradientFallback(item),
+                    // Botón de favorito
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () async {
+                          await _favoritesService.toggleFavorite(item.id);
+                          await _loadFavorites();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            isFavorite ? '🤍' : '🤍',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: isFavorite 
+                                  ? AppColors.expansionAlquimica
+                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Título - tamaño fijo
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                item.title,
+                style: AppTypography.ralewayBold(
+                  fontSize: 12,
+                  color: AppColors.raizSagrada,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Lista de documentos disponibles
   Widget _buildDocumentsList() {
     final documents = _getAvailableDocuments();
@@ -2535,13 +2879,35 @@ class _DocumentViewerState extends State<_DocumentViewer> {
   void initState() {
     super.initState();
     _pdfController = PdfViewerController();
+    _enableScreenshotProtection();
     _loadDocument();
   }
 
   @override
   void dispose() {
+    _disableScreenshotProtection();
     _pdfController.dispose();
     super.dispose();
+  }
+  
+  /// Activar protección contra capturas de pantalla
+  Future<void> _enableScreenshotProtection() async {
+    try {
+      await FlutterScreenshotBlocker.enableScreenshotBlocking();
+      debugPrint('🔒 Protección de capturas activada');
+    } catch (e) {
+      debugPrint('⚠️ No se pudo activar protección de capturas: $e');
+    }
+  }
+  
+  /// Desactivar protección contra capturas de pantalla
+  Future<void> _disableScreenshotProtection() async {
+    try {
+      await FlutterScreenshotBlocker.disableScreenshotBlocking();
+      debugPrint('🔓 Protección de capturas desactivada');
+    } catch (e) {
+      debugPrint('⚠️ No se pudo desactivar protección de capturas: $e');
+    }
   }
 
   Future<void> _loadDocument() async {
