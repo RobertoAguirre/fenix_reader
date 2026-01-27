@@ -824,6 +824,64 @@ class UserContent {
   bool get isNotEmpty => purchases.isNotEmpty;
 }
 
+/// Servicio para obtener URLs directas de videos de Vimeo
+class VimeoService {
+  static const String vimeoApiBase = 'https://api.vimeo.com';
+  static const String _accessToken = '95e64bd6af030d1994fbccac73e5b11f';
+  
+  /// Obtener token de acceso de Vimeo
+  Future<String> getVimeoAccessToken() async {
+    return _accessToken;
+  }
+
+  /// Obtener URL directa de video de Vimeo
+  Future<String?> getVimeoVideoUrl(String videoId) async {
+    try {
+      final accessToken = await getVimeoAccessToken();
+      
+      final response = await http.get(
+        Uri.parse('$vimeoApiBase/videos/$videoId?fields=play'),
+        headers: {
+          'Authorization': 'Bearer $accessToken',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final play = decoded['play'] as Map<String, dynamic>?;
+          if (play != null) {
+            // Intentar obtener URL progresiva (MP4)
+            final progressive = play['progressive'] as List<dynamic>?;
+            if (progressive != null && progressive.isNotEmpty) {
+              // Obtener la mejor calidad disponible
+              final bestQuality = progressive.last as Map<String, dynamic>;
+              final url = bestQuality['url'] as String?;
+              if (url != null) {
+                return url;
+              }
+            }
+            
+            // Si no hay progresivo, intentar HLS
+            final hls = play['hls'] as Map<String, dynamic>?;
+            if (hls != null) {
+              final link = hls['link'] as String?;
+              if (link != null) {
+                return link;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo URL de video de Vimeo: $e');
+      return null;
+    }
+  }
+}
+
 /// Item de contenido (meditación, hipnosis, etc.)
 class ContentItem {
   final int id;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'dart:typed_data';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
@@ -11,10 +12,15 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
 import '../providers/auth_provider.dart';
-import '../services/wordpress_service.dart';
+import '../services/wordpress_service.dart' show WordPressService, ContentItem, ContentType, UserContent, VimeoService;
 import '../widgets/content_card.dart';
 import '../widgets/audio_player_modal.dart';
+import '../widgets/video_player_modal.dart';
 import '../utils/audio_helper.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:http/http.dart' as http;
+import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as html_dom;
 
 /// Pantalla de Portales/Inicio con tabs
 class PortalScreen extends StatefulWidget {
@@ -27,14 +33,14 @@ class PortalScreen extends StatefulWidget {
 class _PortalScreenState extends State<PortalScreen> {
   int _selectedTab = 0;
   final _tabs = [
-    AppConstants.home,
+    AppConstants.portals, // Portales
     AppConstants.hypnosisFenix,
     AppConstants.meditationsFenix,
-    AppConstants.programasFenix,
+    AppConstants.tappings,
     AppConstants.thetaFenix,
+    AppConstants.programasFenix,
     AppConstants.consultaExpres,
     AppConstants.sesionFenix,
-    AppConstants.sesionFenixNinos,
   ];
   
   // Estado para THETAFENIX
@@ -147,7 +153,7 @@ class _PortalScreenState extends State<PortalScreen> {
         color: AppColors.raizSagrada,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 8),
           Consumer<AuthProvider>(
@@ -163,6 +169,7 @@ class _PortalScreenState extends State<PortalScreen> {
                   fontSize: 20,
                   color: AppColors.expansionAlquimica,
                 ),
+                textAlign: TextAlign.center,
               );
             },
           ),
@@ -194,7 +201,7 @@ class _PortalScreenState extends State<PortalScreen> {
 
         // Filtrar contenido según pestaña
         final items = _getFilteredItems(provider);
-        final isLoading = _selectedTab == 3 
+        final isLoading = _selectedTab == 5 
             ? provider.isLoadingPrograms 
             : (_selectedTab == 4 ? _isLoadingThetaFenix : provider.isLoading);
 
@@ -216,31 +223,22 @@ class _PortalScreenState extends State<PortalScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-              Center(
-                child: Text(
-                  'Recursos para almas comprometidas en su camino',
-                  textAlign: TextAlign.center,
-                  style: AppTypography.ralewayRegular(
-                    fontSize: 15,
-                    color: AppColors.raizSagrada.withValues(alpha: 0.7),
-                  ).copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
               const SizedBox(height: 2),
               // Mostrar contenido o estado vacío
               if (isLoading)
                 _buildLoading()
+              else if (_selectedTab == 0)
+                _buildPortalesContent()
               else if (_selectedTab == 3)
-                _buildProgramsList(provider.programs)
+                _buildTappingsContent()
               else if (_selectedTab == 4)
                 _buildThetaFenixContent()
               else if (_selectedTab == 5)
-                _buildConsultaExpresContent()
+                _buildProgramsList(provider.programs)
               else if (_selectedTab == 6)
-                _buildSesionFenixContent()
+                _buildConsultaExpresContent()
               else if (_selectedTab == 7)
-                _buildSesionFenixNinosContent()
+                _buildSesionFenixContent()
               else if (items.isEmpty)
                 _buildEmptyState()
               else
@@ -261,15 +259,15 @@ class _PortalScreenState extends State<PortalScreen> {
         return provider.hypnosis;
       case 2: // MEDITACIONES
         return provider.meditations;
-      case 3: // PROGRAMAS FÉNIX - Se maneja separadamente
+      case 3: // TAPPINGS - Se maneja separadamente
         return [];
       case 4: // THETAFENIX - Se maneja separadamente
         return [];
-      case 5: // CONSULTA EXPRÉS - Se maneja separadamente
+      case 5: // PROGRAMAS FÉNIX - Se maneja separadamente
         return [];
-      case 6: // SESIÓN FÉNIX - Se maneja separadamente
+      case 6: // CONSULTA EXPRÉS - Se maneja separadamente
         return [];
-      case 7: // SESIÓN FÉNIX NIÑOS - Se maneja separadamente
+      case 7: // SESIÓN FÉNIX - Se maneja separadamente
         return [];
       default:
         return provider.all;
@@ -443,14 +441,16 @@ class _PortalScreenState extends State<PortalScreen> {
             tabColor = AppColors.ascenso; // HIPNOSIS: azul-verde claro
           } else if (index == 2) {
             tabColor = AppColors.expansionAlquimica; // MEDITACIONES: verde oliva
+          } else if (index == 3) {
+            tabColor = AppColors.expansionAlquimica; // TAPPINGS: verde oliva
           } else if (index == 4) {
             tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
           } else if (index == 5) {
-            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
+            tabColor = AppColors.expansionAlquimica; // PROGRAMAS FÉNIX: verde oliva
           } else if (index == 6) {
-            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
+            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
           } else if (index == 7) {
-            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX NIÑOS: verde oliva
+            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
           } else {
             tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
           }
@@ -460,7 +460,7 @@ class _PortalScreenState extends State<PortalScreen> {
               onTap: () {
                 setState(() => _selectedTab = index);
                 // Cargar programas si se selecciona esa pestaña
-                if (index == 3) {
+                if (index == 5) {
                   final authProvider = context.read<AuthProvider>();
                   final email = authProvider.user?.email;
                   if (email != null) {
@@ -517,19 +517,19 @@ class _PortalScreenState extends State<PortalScreen> {
         message = 'No tienes meditaciones en tu biblioteca';
         break;
       case 3:
-        message = 'No tienes programas en tu biblioteca';
+        message = 'No tienes Tappings disponibles';
         break;
       case 4:
         message = 'No hay sesiones disponibles en este momento';
         break;
       case 5:
-        message = 'Consulta exprés disponible';
+        message = 'No tienes programas en tu biblioteca';
         break;
       case 6:
-        message = 'Sesión Fénix disponible';
+        message = 'Primeros auxilios disponible';
         break;
       case 7:
-        message = 'Sesión Fénix Niños disponible';
+        message = 'Sesión Fénix disponible';
         break;
       default:
         message = 'Tu biblioteca está vacía';
@@ -1557,6 +1557,223 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
+  /// Construir contenido de PORTALES (Tab 0)
+  Widget _buildPortalesContent() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Fénix alquimista',
+            style: AppTypography.kaushanTitle(
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          
+          // Descripción
+          Text(
+            'Recursos exclusivos para almas comprometidas en su camino.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Video promocional
+          _PortalesVideoPlayer(videoUrl: AppConstants.portalesVideoUrl),
+          const SizedBox(height: 24),
+          
+          // Lista de documentos
+          _buildDocumentsList(),
+          const SizedBox(height: 24),
+          
+          // Botón Apoyo Fénix
+          Center(
+            child: GestureDetector(
+              onTap: _openWhatsAppApoyo,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Apoyo Fénix',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 16,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Lista de documentos disponibles
+  Widget _buildDocumentsList() {
+    final documents = _getAvailableDocuments();
+    
+    if (documents.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...documents.map((doc) => _buildDocumentCard(doc)),
+      ],
+    );
+  }
+
+  /// Obtener documentos disponibles (PDFs de Google Docs)
+  List<Map<String, dynamic>> _getAvailableDocuments() {
+    return [
+      {
+        'id': '1',
+        'titulo': 'Mensajes del universo',
+        'descripcion': 'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
+        'url': 'https://docs.google.com/document/d/1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk/export?format=pdf',
+      },
+      {
+        'id': '2',
+        'titulo': 'Astrología',
+        'descripcion': 'Descubre la energía de la luna y fases astrológicas para usar a tu favor',
+        'url': 'https://docs.google.com/document/d/17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do/export?format=pdf',
+      },
+      {
+        'id': '3',
+        'titulo': 'Emociones',
+        'descripcion': 'Descubre el mensaje detrás de tus emociones y recuerda quién eres',
+        'url': 'https://docs.google.com/document/d/1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60/export?format=pdf',
+      },
+    ];
+  }
+
+  /// Construir card de documento
+  Widget _buildDocumentCard(Map<String, dynamic> document) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.raizSagrada.withValues(alpha: 0.1),
+        ),
+      ),
+      child: InkWell(
+        onTap: () => _openDocument(document),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: AppColors.expansionAlquimica,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      document['titulo'] as String,
+                      style: AppTypography.ralewayBold(
+                        fontSize: 16,
+                        color: AppColors.raizSagrada,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      document['descripcion'] as String,
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 12,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.raizSagrada.withValues(alpha: 0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Abrir documento
+  void _openDocument(Map<String, dynamic> document) {
+    // Abrir visor nativo de documento
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _DocumentViewer(
+          document: document,
+        ),
+      ),
+    );
+  }
+
+  /// Abrir WhatsApp para Apoyo Fénix
+  Future<void> _openWhatsAppApoyo() async {
+    try {
+      final message = Uri.encodeComponent('¡Hola! Me gustaría obtener más información.\n¡Gracias!👋');
+      final whatsappUrl = 'https://api.whatsapp.com/send?phone=${AppConstants.whatsappNumber}&text=$message';
+      final uri = Uri.parse(whatsappUrl);
+      
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error abriendo WhatsApp: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al abrir WhatsApp'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   /// Construir contenido de SESIÓN FÉNIX
   Widget _buildSesionFenixContent() {
     return Padding(
@@ -1622,67 +1839,353 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Construir contenido de SESIÓN FÉNIX NIÑOS
-  Widget _buildSesionFenixNinosContent() {
+  /// Obtener Tappings del contenido del usuario
+  List<ContentItem> _getTappings(ContentProvider provider) {
+    return provider.all.where((item) {
+      final category = (item.category ?? '').toLowerCase();
+      final title = item.title.toLowerCase();
+      return category.contains('tapping') || 
+             category.contains('tappings') ||
+             title.contains('tapping') ||
+             title.contains('tappings');
+    }).toList();
+  }
+
+  /// Construir contenido de TAPPINGS
+  Widget _buildTappingsContent() {
+    final provider = context.watch<ContentProvider>();
+    final authProvider = context.watch<AuthProvider>();
+    final tappings = _getTappings(provider);
+    final isLoading = provider.isLoading;
+
+    // Cargar contenido del usuario si no está cargado
+    if (!isLoading && provider.content == null && authProvider.user?.email != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        provider.loadUserContent(authProvider.user!.email!);
+      });
+    }
+
+    if (isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(
+            color: AppColors.ascenso,
+          ),
+        ),
+      );
+    }
+
+    if (tappings.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.video_library_outlined,
+                size: 64,
+                color: AppColors.raizSagrada.withValues(alpha: 0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No tienes Tappings disponibles',
+                style: AppTypography.ralewayRegular(
+                  fontSize: 16,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: tappings.length,
+        itemBuilder: (context, index) {
+          final tapping = tappings[index];
+          return _buildTappingCard(tapping);
+        },
+      ),
+    );
+  }
+
+  /// Construir card de Tapping individual
+  Widget _buildTappingCard(ContentItem tapping) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.raizSagrada.withValues(alpha: 0.1),
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Título
-          Text(
-            'Alinearse y liberar desde pequeños nunca fué tan fácil.',
-            style: AppTypography.kaushanTitle(
-              fontSize: 20,
-              color: AppColors.raizSagrada,
+          // Imagen destacada (si existe)
+          if (tapping.image != null && tapping.image!.isNotEmpty)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: CachedNetworkImage(
+                imageUrl: tapping.image!,
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  height: 200,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.1),
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.ascenso,
+                    ),
+                  ),
+                ),
+                errorWidget: (context, url, error) => Container(
+                  height: 200,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.1),
+                  child: Icon(
+                    Icons.video_library_outlined,
+                    size: 48,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.3),
+                  ),
+                ),
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
           
-          // Video promocional
-          _SesionFenixNinosVideoPlayer(videoUrl: AppConstants.sesionFenixNinosVideoUrl),
-          const SizedBox(height: 20),
-          
-          // Descripción
-          Text(
-            'Confía.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Título
+                Text(
+                  tapping.title,
+                  style: AppTypography.ralewayBold(
+                    fontSize: 18,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                // Descripción (si existe)
+                if (tapping.description != null && tapping.description!.isNotEmpty)
+                  Text(
+                    _cleanDescription(tapping.description!),
+                    style: AppTypography.ralewayRegular(
+                      fontSize: 14,
+                      color: AppColors.raizSagrada.withValues(alpha: 0.8),
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                
+                const SizedBox(height: 16),
+                
+                // Reproductor de video
+                if (tapping.downloadUrl != null && tapping.downloadUrl!.isNotEmpty)
+                  _TappingVideoPlayer(
+                    videoUrl: tapping.downloadUrl!,
+                    title: tapping.title,
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.raizSagrada.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Video no disponible',
+                            style: AppTypography.ralewayRegular(
+                              fontSize: 14,
+                              color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Sanar es posible, incluso en los más pequeños.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          
-          // Información de la sesión
-          Text(
-            'Modalidad Online',
-            style: AppTypography.ralewayBold(
-              fontSize: 16,
-              color: AppColors.raizSagrada,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Para niños menores de 12 años',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Widget para reproducir video de Tapping (URL directa o YouTube)
+class _TappingVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  final String title;
+
+  const _TappingVideoPlayer({
+    required this.videoUrl,
+    required this.title,
+  });
+
+  @override
+  State<_TappingVideoPlayer> createState() => _TappingVideoPlayerState();
+}
+
+class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
+  VideoPlayerController? _controller;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    _loadVideo();
+  }
+
+  Future<void> _loadVideo() async {
+    try {
+      // Verificar si es URL de YouTube
+      final youtubeMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
+      
+      if (youtubeMatch != null) {
+        // Es YouTube - usar YoutubeExplode
+        final videoId = youtubeMatch.group(1)!;
+        final yt = YoutubeExplode();
+        final manifest = await yt.videos.streams.getManifest(videoId);
+        
+        VideoStreamInfo? streamInfo;
+        if (manifest.muxed.isNotEmpty) {
+          streamInfo = manifest.muxed.last;
+        } else if (manifest.videoOnly.isNotEmpty) {
+          streamInfo = manifest.videoOnly.last;
+        }
+        
+        if (streamInfo == null) {
+          setState(() {
+            _hasError = true;
+            _isLoading = false;
+          });
+          yt.close();
+          return;
+        }
+        
+        _controller = VideoPlayerController.networkUrl(streamInfo.url);
+        yt.close();
+      } else {
+        // Es URL directa de video
+        _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      }
+
+      await _controller!.initialize();
+
+      _chewieController = ChewieController(
+        videoPlayerController: _controller!,
+        autoPlay: false,
+        looping: false,
+        aspectRatio: _controller!.value.aspectRatio,
+        showControls: true,
+        allowFullScreen: false,
+        allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              'Error al cargar el video',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.error,
+              ),
+            ),
+          );
+        },
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error cargando video de Tapping: $e');
+      setState(() {
+        _hasError = true;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _chewieController?.dispose();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: 225,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.raizSagrada.withValues(alpha: 0.1),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.ascenso,
+                ),
+              )
+            : _hasError
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          size: 48,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Error al cargar el video',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const SizedBox.shrink(),
       ),
     );
   }
@@ -1855,17 +2358,17 @@ class _SesionFenixVideoPlayerState extends State<_SesionFenixVideoPlayer> {
   }
 }
 
-/// Widget para reproducir video de YouTube de forma nativa (SESIÓN FÉNIX NIÑOS)
-class _SesionFenixNinosVideoPlayer extends StatefulWidget {
+/// Widget para reproducir video de Vimeo de forma nativa (PORTALES)
+class _PortalesVideoPlayer extends StatefulWidget {
   final String videoUrl;
 
-  const _SesionFenixNinosVideoPlayer({required this.videoUrl});
+  const _PortalesVideoPlayer({required this.videoUrl});
 
   @override
-  State<_SesionFenixNinosVideoPlayer> createState() => _SesionFenixNinosVideoPlayerState();
+  State<_PortalesVideoPlayer> createState() => _PortalesVideoPlayerState();
 }
 
-class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlayer> {
+class _PortalesVideoPlayerState extends State<_PortalesVideoPlayer> {
   VideoPlayerController? _controller;
   ChewieController? _chewieController;
   bool _isLoading = true;
@@ -1874,7 +2377,6 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
   @override
   void initState() {
     super.initState();
-    // Forzar orientación portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -1884,9 +2386,9 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
 
   Future<void> _loadVideo() async {
     try {
-      // Extraer ID del video de YouTube de la URL embebida
-      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
-      if (videoIdMatch == null) {
+      // Extraer ID de Vimeo de la URL
+      final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
+      if (vimeoMatch == null) {
         setState(() {
           _hasError = true;
           _isLoading = false;
@@ -1894,35 +2396,22 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
         return;
       }
 
-      final videoId = videoIdMatch.group(1)!;
+      final videoId = vimeoMatch.group(1)!;
       
-      // Usar YoutubeExplode para obtener la URL directa del video
-      final yt = YoutubeExplode();
-      final manifest = await yt.videos.streams.getManifest(videoId);
+      // Obtener URL directa usando API de Vimeo
+      final vimeoService = VimeoService();
+      final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
       
-      // Obtener el stream de mejor calidad disponible
-      VideoStreamInfo? streamInfo;
-      
-      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
-      if (manifest.muxed.isNotEmpty) {
-        // Tomar el último stream muxed (suele ser el de mayor calidad)
-        streamInfo = manifest.muxed.last;
-      } else if (manifest.videoOnly.isNotEmpty) {
-        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
-        streamInfo = manifest.videoOnly.last;
-      }
-      
-      if (streamInfo == null) {
+      if (directUrl == null || directUrl.isEmpty) {
         setState(() {
           _hasError = true;
           _isLoading = false;
         });
-        yt.close();
         return;
       }
 
-      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
-      _controller = VideoPlayerController.networkUrl(streamInfo.url);
+      // Crear controlador de video con la URL directa
+      _controller = VideoPlayerController.networkUrl(Uri.parse(directUrl));
 
       await _controller!.initialize();
 
@@ -1932,7 +2421,7 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
         looping: false,
         aspectRatio: _controller!.value.aspectRatio,
         showControls: true,
-        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
+        allowFullScreen: false,
         allowMuting: true,
         allowPlaybackSpeedChanging: false,
         errorBuilder: (context, errorMessage) {
@@ -1948,13 +2437,11 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
         },
       );
 
-      yt.close();
-
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('❌ Error cargando video de YouTube: $e');
+      debugPrint('❌ Error cargando video de Vimeo: $e');
       setState(() {
         _hasError = true;
         _isLoading = false;
@@ -1964,7 +2451,6 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
 
   @override
   void dispose() {
-    // Restaurar todas las orientaciones permitidas
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -2018,6 +2504,437 @@ class _SesionFenixNinosVideoPlayerState extends State<_SesionFenixNinosVideoPlay
                     ? Chewie(controller: _chewieController!)
                     : const SizedBox.shrink(),
       ),
+    );
+  }
+}
+
+/// Visor de documentos PDF nativo con navegación entre páginas
+class _DocumentViewer extends StatefulWidget {
+  final Map<String, dynamic> document;
+
+  const _DocumentViewer({required this.document});
+
+  @override
+  State<_DocumentViewer> createState() => _DocumentViewerState();
+}
+
+class _DocumentViewerState extends State<_DocumentViewer> {
+  bool _isLoading = true;
+  String? _error;
+  Uint8List? _pdfBytes;
+  
+  // Controlador del PDF viewer
+  late PdfViewerController _pdfController;
+  
+  // Estado de navegación
+  int _currentPage = 1;
+  int _totalPages = 0;
+  double _currentZoom = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pdfController = PdfViewerController();
+    _loadDocument();
+  }
+
+  @override
+  void dispose() {
+    _pdfController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadDocument() async {
+    try {
+      final url = widget.document['url'] as String;
+      
+      // Cargar PDF
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        setState(() {
+          _pdfBytes = response.bodyBytes;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = 'Error al cargar el documento (${response.statusCode})';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error cargando documento: $e');
+      setState(() {
+        _error = 'Error al cargar el documento. Verifica tu conexión.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _goToPage(int page) {
+    if (page >= 1 && page <= _totalPages) {
+      _pdfController.jumpToPage(page);
+    }
+  }
+
+  void _nextPage() {
+    if (_currentPage < _totalPages) {
+      _pdfController.nextPage();
+    }
+  }
+
+  void _previousPage() {
+    if (_currentPage > 1) {
+      _pdfController.previousPage();
+    }
+  }
+
+  void _zoomIn() {
+    final newZoom = (_currentZoom + 0.25).clamp(0.5, 3.0);
+    _pdfController.zoomLevel = newZoom;
+  }
+
+  void _zoomOut() {
+    final newZoom = (_currentZoom - 0.25).clamp(0.5, 3.0);
+    _pdfController.zoomLevel = newZoom;
+  }
+
+  void _showPageSelector() {
+    showDialog(
+      context: context,
+      builder: (context) => _PageSelectorDialog(
+        currentPage: _currentPage,
+        totalPages: _totalPages,
+        onPageSelected: _goToPage,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.origen,
+      appBar: AppBar(
+        backgroundColor: AppColors.raizSagrada,
+        title: Text(
+          widget.document['titulo'] as String,
+          style: AppTypography.kaushanTitle(
+            fontSize: 20,
+            color: AppColors.white,
+          ),
+        ),
+        iconTheme: const IconThemeData(color: AppColors.white),
+        actions: _pdfBytes != null ? [
+          IconButton(
+            icon: const Icon(Icons.zoom_out, color: AppColors.white),
+            onPressed: _zoomOut,
+            tooltip: 'Alejar',
+          ),
+          IconButton(
+            icon: const Icon(Icons.zoom_in, color: AppColors.white),
+            onPressed: _zoomIn,
+            tooltip: 'Acercar',
+          ),
+        ] : null,
+      ),
+      body: _isLoading
+          ? _buildLoadingState()
+          : _error != null
+              ? _buildErrorState()
+              : _pdfBytes != null
+                  ? _buildPdfViewer()
+                  : const SizedBox.shrink(),
+      bottomNavigationBar: _pdfBytes != null && !_isLoading && _error == null
+          ? _buildNavigationBar()
+          : null,
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(color: AppColors.ascenso),
+          const SizedBox(height: 16),
+          Text(
+            'Cargando documento...',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: AppColors.error,
+              size: 56,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _error!,
+              style: AppTypography.ralewayRegular(
+                fontSize: 16,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _isLoading = true;
+                  _error = null;
+                });
+                _loadDocument();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.ascenso,
+                foregroundColor: AppColors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPdfViewer() {
+    return SfPdfViewer.memory(
+      _pdfBytes!,
+      controller: _pdfController,
+      enableDoubleTapZooming: true,
+      enableTextSelection: false,
+      canShowScrollHead: true,
+      canShowScrollStatus: true,
+      pageLayoutMode: PdfPageLayoutMode.single,
+      scrollDirection: PdfScrollDirection.horizontal,
+      onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+        setState(() {
+          _totalPages = details.document.pages.count;
+        });
+      },
+      onPageChanged: (PdfPageChangedDetails details) {
+        setState(() {
+          _currentPage = details.newPageNumber;
+        });
+      },
+      onZoomLevelChanged: (PdfZoomDetails details) {
+        setState(() {
+          _currentZoom = details.newZoomLevel;
+        });
+      },
+    );
+  }
+
+  Widget _buildNavigationBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 12,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.raizSagrada.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Botón página anterior
+          IconButton(
+            onPressed: _currentPage > 1 ? _previousPage : null,
+            icon: Icon(
+              Icons.chevron_left,
+              color: _currentPage > 1 
+                  ? AppColors.raizSagrada 
+                  : AppColors.raizSagrada.withValues(alpha: 0.3),
+              size: 32,
+            ),
+            tooltip: 'Página anterior',
+          ),
+          
+          // Indicador de página (tocable para ir a página específica)
+          GestureDetector(
+            onTap: _totalPages > 1 ? _showPageSelector : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$_currentPage / $_totalPages',
+                    style: AppTypography.ralewayBold(
+                      fontSize: 16,
+                      color: AppColors.raizSagrada,
+                    ),
+                  ),
+                  if (_totalPages > 1) ...[
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.unfold_more,
+                      size: 18,
+                      color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          
+          // Botón página siguiente
+          IconButton(
+            onPressed: _currentPage < _totalPages ? _nextPage : null,
+            icon: Icon(
+              Icons.chevron_right,
+              color: _currentPage < _totalPages 
+                  ? AppColors.raizSagrada 
+                  : AppColors.raizSagrada.withValues(alpha: 0.3),
+              size: 32,
+            ),
+            tooltip: 'Página siguiente',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Diálogo para seleccionar página específica
+class _PageSelectorDialog extends StatefulWidget {
+  final int currentPage;
+  final int totalPages;
+  final Function(int) onPageSelected;
+
+  const _PageSelectorDialog({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onPageSelected,
+  });
+
+  @override
+  State<_PageSelectorDialog> createState() => _PageSelectorDialogState();
+}
+
+class _PageSelectorDialogState extends State<_PageSelectorDialog> {
+  late TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentPage.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _goToPage() {
+    final page = int.tryParse(_controller.text);
+    if (page == null || page < 1 || page > widget.totalPages) {
+      setState(() {
+        _errorText = 'Ingresa un número entre 1 y ${widget.totalPages}';
+      });
+      return;
+    }
+    Navigator.of(context).pop();
+    widget.onPageSelected(page);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Ir a página',
+        style: AppTypography.ralewayBold(
+          fontSize: 18,
+          color: AppColors.raizSagrada,
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: '1 - ${widget.totalPages}',
+              errorText: _errorText,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.ascenso, width: 2),
+              ),
+            ),
+            onSubmitted: (_) => _goToPage(),
+            onChanged: (_) {
+              if (_errorText != null) {
+                setState(() => _errorText = null);
+              }
+            },
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Total: ${widget.totalPages} páginas',
+            style: AppTypography.ralewayRegular(
+              fontSize: 12,
+              color: AppColors.raizSagrada.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            'Cancelar',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: _goToPage,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.ascenso,
+            foregroundColor: AppColors.white,
+          ),
+          child: const Text('Ir'),
+        ),
+      ],
     );
   }
 }
