@@ -39,6 +39,7 @@ class _PortalScreenState extends State<PortalScreen> {
     AppConstants.hypnosisFenix,
     AppConstants.meditationsFenix,
     AppConstants.tappings,
+    AppConstants.clases,
     AppConstants.thetaFenix,
     AppConstants.programasFenix,
     AppConstants.consultaExpres,
@@ -63,6 +64,10 @@ class _PortalScreenState extends State<PortalScreen> {
   // Estado para TAPPINGS
   final TextEditingController _tappingsSearchController = TextEditingController();
   bool _showTappingsFavoritesOnly = false;
+  
+  // Estado para CLASES
+  final TextEditingController _clasesSearchController = TextEditingController();
+  bool _showClasesFavoritesOnly = false;
 
   @override
   void initState() {
@@ -71,6 +76,8 @@ class _PortalScreenState extends State<PortalScreen> {
     _loadProgramsIfNeeded();
     // Cargar favoritos cuando se monta el widget
     _loadFavorites();
+    // Listar videos de Vimeo para identificar URLs correctas
+    _listVimeoVideos();
   }
 
   @override
@@ -78,7 +85,14 @@ class _PortalScreenState extends State<PortalScreen> {
     _hypnosisSearchController.dispose();
     _meditationsSearchController.dispose();
     _tappingsSearchController.dispose();
+    _clasesSearchController.dispose();
     super.dispose();
+  }
+
+  /// Detener todos los videos activos al cambiar de pestaña
+  void _stopAllVideos() {
+    // Los videos se detendrán automáticamente cuando se destruyan los widgets
+    // al cambiar de pestaña gracias a las claves únicas
   }
 
   void _loadProgramsIfNeeded() {
@@ -219,7 +233,7 @@ class _PortalScreenState extends State<PortalScreen> {
         }
         
         // Cargar sesiones de THETAFENIX si se selecciona la pestaña
-        if (_selectedTab == 4 && _thetaFenixSessions.isEmpty && !_isLoadingThetaFenix) {
+        if (_selectedTab == 5 && _thetaFenixSessions.isEmpty && !_isLoadingThetaFenix) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _loadThetaFenixSessions();
           });
@@ -227,16 +241,18 @@ class _PortalScreenState extends State<PortalScreen> {
 
         // Filtrar contenido según pestaña
         final items = _getFilteredItems(provider);
-        final isLoading = _selectedTab == 5 
+        final isLoading = _selectedTab == 6 
             ? provider.isLoadingPrograms 
-            : (_selectedTab == 4 ? _isLoadingThetaFenix : provider.isLoading);
+            : (_selectedTab == 5 ? _isLoadingThetaFenix : provider.isLoading);
 
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 22),
-              _buildTabs(),
+        return GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 22),
+                _buildTabs(),
               const SizedBox(height: 27),
               // Título de sección - Usa el título de la pestaña seleccionada
               Center(
@@ -245,7 +261,19 @@ class _PortalScreenState extends State<PortalScreen> {
                       ? 'Hipnosis Fénix' 
                       : (_selectedTab == 2 
                           ? 'Meditaciones Fénix' 
-                          : (_selectedTab == 3 ? 'Tappings' : _tabs[_selectedTab])),
+                          : (_selectedTab == 3 
+                              ? 'Tappings' 
+                              : (_selectedTab == 4 
+                                  ? 'Clases' 
+                                  : (_selectedTab == 5 
+                                      ? 'ThetaFénix'
+                                      : (_selectedTab == 6
+                                          ? 'Programas Fénix'
+                                          : (_selectedTab == 7
+                                              ? 'Apoyo Fénix'
+                                              : (_selectedTab == 8
+                                                  ? 'Sesión Fénix'
+                                                  : _tabs[_selectedTab]))))))),
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
@@ -266,12 +294,14 @@ class _PortalScreenState extends State<PortalScreen> {
               else if (_selectedTab == 3)
                 _buildTappingsContent(provider)
               else if (_selectedTab == 4)
-                _buildThetaFenixContent()
+                _buildClasesContent(provider)
               else if (_selectedTab == 5)
-                _buildProgramsList(provider.programs)
+                _buildThetaFenixContent()
               else if (_selectedTab == 6)
-                _buildConsultaExpresContent()
+                _buildProgramsList(provider.programs)
               else if (_selectedTab == 7)
+                _buildConsultaExpresContent()
+              else if (_selectedTab == 8)
                 _buildSesionFenixContent()
               else if (items.isEmpty)
                 _buildEmptyState()
@@ -280,6 +310,7 @@ class _PortalScreenState extends State<PortalScreen> {
               const SizedBox(height: 20),
             ],
           ),
+        ),
         );
       },
     );
@@ -295,13 +326,15 @@ class _PortalScreenState extends State<PortalScreen> {
         return provider.meditations;
       case 3: // TAPPINGS - Se maneja separadamente
         return [];
-      case 4: // THETAFENIX - Se maneja separadamente
+      case 4: // CLASES - Se maneja separadamente
         return [];
-      case 5: // PROGRAMAS FÉNIX - Se maneja separadamente
+      case 5: // THETAFENIX - Se maneja separadamente
         return [];
-      case 6: // CONSULTA EXPRÉS - Se maneja separadamente
+      case 6: // PROGRAMAS FÉNIX - Se maneja separadamente
         return [];
-      case 7: // SESIÓN FÉNIX - Se maneja separadamente
+      case 7: // CONSULTA EXPRÉS - Se maneja separadamente
+        return [];
+      case 8: // SESIÓN FÉNIX - Se maneja separadamente
         return [];
       default:
         return provider.all;
@@ -320,26 +353,39 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   Widget _buildProgramsList(List<Map<String, dynamic>> programs) {
-    if (programs.isEmpty) {
-      return _buildEmptyState();
-    }
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 0.75,
-        ),
-        itemCount: programs.length,
-        itemBuilder: (context, index) {
-          final program = programs[index];
-          return _buildProgramGridCard(program);
-        },
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Video promocional
+          _PortalesVideoPlayer(
+            key: ValueKey('programas_$_selectedTab'),
+            videoUrl: AppConstants.programasFenixVideoUrl,
+          ),
+          const SizedBox(height: 20),
+          
+          // Grid de programas
+          if (programs.isEmpty)
+            _buildEmptyState()
+          else
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.75,
+              ),
+              itemCount: programs.length,
+              itemBuilder: (context, index) {
+                final program = programs[index];
+                return _buildProgramGridCard(program);
+              },
+            ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -478,12 +524,14 @@ class _PortalScreenState extends State<PortalScreen> {
           } else if (index == 3) {
             tabColor = AppColors.expansionAlquimica; // TAPPINGS: verde oliva
           } else if (index == 4) {
-            tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
+            tabColor = AppColors.expansionAlquimica; // CLASES: verde oliva
           } else if (index == 5) {
-            tabColor = AppColors.expansionAlquimica; // PROGRAMAS FÉNIX: verde oliva
+            tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
           } else if (index == 6) {
-            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
+            tabColor = AppColors.expansionAlquimica; // PROGRAMAS FÉNIX: verde oliva
           } else if (index == 7) {
+            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
+          } else if (index == 8) {
             tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
           } else {
             tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
@@ -492,9 +540,11 @@ class _PortalScreenState extends State<PortalScreen> {
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
               onTap: () {
+                // Detener todos los videos antes de cambiar de pestaña
+                _stopAllVideos();
                 setState(() => _selectedTab = index);
                 // Cargar programas si se selecciona esa pestaña
-                if (index == 5) {
+                if (index == 6) {
                   final authProvider = context.read<AuthProvider>();
                   final email = authProvider.user?.email;
                   if (email != null) {
@@ -502,7 +552,7 @@ class _PortalScreenState extends State<PortalScreen> {
                   }
                 }
                 // Cargar sesiones de THETAFENIX si se selecciona esa pestaña
-                if (index == 4) {
+                if (index == 5) {
                   _loadThetaFenixSessions();
                 }
               },
@@ -554,15 +604,18 @@ class _PortalScreenState extends State<PortalScreen> {
         message = 'No tienes Tappings disponibles';
         break;
       case 4:
-        message = 'No hay sesiones disponibles en este momento';
+        message = 'No tienes clases disponibles';
         break;
       case 5:
-        message = 'No tienes programas en tu biblioteca';
+        message = 'No hay sesiones disponibles en este momento';
         break;
       case 6:
-        message = 'Primeros auxilios disponible';
+        message = 'No tienes programas en tu biblioteca';
         break;
       case 7:
+        message = 'Apoyo Fénix disponible';
+        break;
+      case 8:
         message = 'Sesión Fénix disponible';
         break;
       default:
@@ -1422,7 +1475,10 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Construir widget de video de YouTube para THETAFENIX
   Widget _buildThetaFenixVideo() {
-    return _ThetaFenixVideoPlayer(videoUrl: AppConstants.thetaFenixVideoUrl);
+    return _ThetaFenixVideoPlayer(
+      key: ValueKey('theta_$_selectedTab'),
+      videoUrl: AppConstants.thetaFenixVideoUrl,
+    );
   }
 
   /// Construir contenido de CONSULTA EXPRÉS
@@ -1430,13 +1486,24 @@ class _PortalScreenState extends State<PortalScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Título
           Text(
-            'Un espacio seguro y profesional, justo cuando más lo necesitas.',
+            'Un espacio seguro y profesional',
             style: AppTypography.kaushanTitle(
-              fontSize: 20,
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          
+          // Texto descriptivo
+          Text(
+            'Accede a este espacio seguro y obtén guía y claridad ahora mismo.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
               color: AppColors.raizSagrada,
             ),
             textAlign: TextAlign.center,
@@ -1444,54 +1511,33 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 20),
           
           // Video promocional
-          _ConsultaExpresVideoPlayer(videoUrl: AppConstants.consultaExpresVideoUrl),
-          const SizedBox(height: 20),
-          
-          // Descripción
-          Text(
-            'Aquí no estás solx: estoy para escucharte, guiarte y darte claridad para recuperar tu equilibrio.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
-            ),
-            textAlign: TextAlign.center,
+          _ConsultaExpresVideoPlayer(
+            key: ValueKey('consulta_$_selectedTab'),
+            videoUrl: AppConstants.consultaExpresVideoUrl,
           ),
           const SizedBox(height: 24),
           
-          // Botón de apoyo de emergencia
+          // Botón Apoyo Fénix
           Center(
-            child: Column(
-              children: [
-                GestureDetector(
-                  onTap: _openWhatsAppConsulta,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.ascenso,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Apoyo de emergencia',
-                      style: AppTypography.ralewayBold(
-                        fontSize: 14,
-                        color: AppColors.white,
-                      ),
-                    ),
+            child: GestureDetector(
+              onTap: _openWhatsAppConsulta,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Apoyo Fénix',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 18,
+                    color: AppColors.white,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Soporte oportuno disponible',
-                  style: AppTypography.ralewayRegular(
-                    fontSize: 12,
-                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -1621,7 +1667,10 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 20),
           
           // Video promocional
-          _PortalesVideoPlayer(videoUrl: AppConstants.portalesVideoUrl),
+          _PortalesVideoPlayer(
+            key: ValueKey('portales_$_selectedTab'),
+            videoUrl: AppConstants.portalesVideoUrl,
+          ),
           const SizedBox(height: 24),
           
           // Lista de documentos
@@ -1679,7 +1728,10 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 12),
           
           // Video promocional
-          _PortalesVideoPlayer(videoUrl: AppConstants.hypnosisFenixVideoUrl),
+          _PortalesVideoPlayer(
+            key: ValueKey('hypnosis_$_selectedTab'),
+            videoUrl: AppConstants.hypnosisFenixVideoUrl,
+          ),
           const SizedBox(height: 16),
           
           // Texto descriptivo
@@ -1861,6 +1913,98 @@ class _PortalScreenState extends State<PortalScreen> {
     });
   }
 
+  /// Listar videos de Vimeo y mostrarlos en consola
+  Future<void> _listVimeoVideos() async {
+    try {
+      final vimeoService = VimeoService();
+      
+      debugPrint('\n');
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('🔍 BUSCANDO VIDEOS INTRODUCTORIOS ESPECÍFICOS');
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('');
+      
+      // Buscar videos introductorios específicos
+      final introVideos = [
+        {'name': 'Bienvenida', 'key': 'portales'},
+        {'name': 'Hipnosis Fénix', 'key': 'hypnosis'},
+        {'name': 'Meditaciones Fénix', 'key': 'meditations'},
+        {'name': 'Tappings', 'key': 'tappings'},
+        {'name': 'Clases Fénix', 'key': 'clases'},
+        {'name': 'Programas Fénix', 'key': 'programas'},
+      ];
+      
+      final foundVideos = <String, Map<String, dynamic>>{};
+      
+      for (var search in introVideos) {
+        final video = await vimeoService.findVideoByName(search['name'] as String);
+        if (video != null) {
+          foundVideos[search['key'] as String] = video;
+          final id = video['id'] as String;
+          final title = video['title'] as String;
+          final duration = video['duration'] as int;
+          
+          final minutes = duration ~/ 60;
+          final seconds = duration % 60;
+          final durationStr = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+          
+          debugPrint('✅ ${search['name']}:');
+          debugPrint('   ID: $id');
+          debugPrint('   Título: $title');
+          debugPrint('   Duración: $durationStr');
+          debugPrint('   URL para app: https://vimeo.com/$id?share=copy&fl=sv&fe=ci');
+          debugPrint('');
+        } else {
+          debugPrint('❌ ${search['name']}: NO ENCONTRADO');
+          debugPrint('');
+        }
+      }
+      
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('📋 CONFIGURACIÓN ACTUAL vs ENCONTRADA');
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('');
+      
+      // Comparar con configuración actual
+      final currentConfig = {
+        'portales': AppConstants.portalesVideoUrl,
+        'hypnosis': AppConstants.hypnosisFenixVideoUrl,
+        'meditations': AppConstants.meditationsFenixVideoUrl,
+        'tappings': AppConstants.tappingsVideoUrl,
+        'clases': AppConstants.clasesVideoUrl,
+      };
+      
+      for (var entry in currentConfig.entries) {
+        final key = entry.key;
+        final currentUrl = entry.value;
+        final found = foundVideos[key];
+        
+        if (found != null) {
+          final foundId = found['id'] as String;
+          final foundUrl = 'https://vimeo.com/$foundId?share=copy&fl=sv&fe=ci';
+          final currentId = currentUrl.split('/')[3].split('?')[0];
+          
+          if (currentId == foundId) {
+            debugPrint('✅ ${key.toUpperCase()}: CORRECTO (ID: $currentId)');
+          } else {
+            debugPrint('⚠️  ${key.toUpperCase()}: DIFERENTE');
+            debugPrint('   Actual: $currentUrl');
+            debugPrint('   Encontrado: $foundUrl');
+          }
+        } else {
+          debugPrint('❓ ${key.toUpperCase()}: No encontrado en búsqueda');
+          debugPrint('   Actual: $currentUrl');
+        }
+        debugPrint('');
+      }
+      
+      debugPrint('═══════════════════════════════════════════════════════════');
+      debugPrint('\n');
+    } catch (e) {
+      debugPrint('❌ Error listando videos de Vimeo: $e');
+    }
+  }
+
   /// Grid de hipnosis con favoritos y descripción
   Widget _buildHypnosisGrid(List<ContentItem> items) {
     return GridView.builder(
@@ -2005,7 +2149,10 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 12),
           
           // Video promocional
-          _PortalesVideoPlayer(videoUrl: AppConstants.meditationsFenixVideoUrl),
+          _PortalesVideoPlayer(
+            key: ValueKey('meditations_$_selectedTab'),
+            videoUrl: AppConstants.meditationsFenixVideoUrl,
+          ),
           const SizedBox(height: 16),
           
           // Texto descriptivo
@@ -2433,7 +2580,10 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 20),
           
           // Video promocional
-          _SesionFenixVideoPlayer(videoUrl: AppConstants.sesionFenixVideoUrl),
+          _SesionFenixVideoPlayer(
+            key: ValueKey('sesion_$_selectedTab'),
+            videoUrl: AppConstants.sesionFenixVideoUrl,
+          ),
           const SizedBox(height: 20),
           
           // Descripción
@@ -2533,7 +2683,10 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 12),
           
           // Video promocional
-          _PortalesVideoPlayer(videoUrl: AppConstants.tappingsVideoUrl),
+          _PortalesVideoPlayer(
+            key: ValueKey('tappings_$_selectedTab'),
+            videoUrl: AppConstants.tappingsVideoUrl,
+          ),
           const SizedBox(height: 16),
           
           // Texto descriptivo
@@ -2847,7 +3000,30 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Mostrar modal con video completo de tapping
   void _showTappingModal(ContentItem tapping) {
-    if (tapping.downloadUrl == null || tapping.downloadUrl!.isEmpty) {
+    // TODO: TEMPORAL - URLs hardcodeadas para pasar verificación de Apple.
+    // IMPORTANTE: Modificar backend de WordPress para que la API /user-purchases
+    // devuelva el campo video_url con la URL de Vimeo del tapping.
+    // Luego eliminar este mapeo y usar tapping.downloadUrl directamente.
+    String? videoUrl = tapping.downloadUrl;
+    
+    if (videoUrl == null || videoUrl.isEmpty) {
+      // Mapeo temporal de tappings a URLs de Vimeo
+      final tappingVideoMap = {
+        'soltar el control': 'https://vimeo.com/1120509658',
+        'desbloquear la abundancia': 'https://vimeo.com/1120509396',
+        'ansiedad': 'https://vimeo.com/1120509009',
+      };
+      
+      final titleLower = tapping.title.toLowerCase();
+      for (final entry in tappingVideoMap.entries) {
+        if (titleLower.contains(entry.key)) {
+          videoUrl = entry.value;
+          break;
+        }
+      }
+    }
+    
+    if (videoUrl == null || videoUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No hay video disponible para ${tapping.title}'),
@@ -2901,7 +3077,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _TappingVideoPlayer(
-                  videoUrl: tapping.downloadUrl!,
+                  videoUrl: videoUrl!,
                   title: tapping.title,
                 ),
               ),
@@ -2912,6 +3088,425 @@ class _PortalScreenState extends State<PortalScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   _cleanDescription(tapping.description!),
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.8),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Construir contenido de CLASES
+  Widget _buildClasesContent(ContentProvider provider) {
+    final allClases = _getClases(provider);
+    final filteredClases = _getFilteredClasesItems(allClases);
+    final isLoading = provider.isLoading;
+
+    if (isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40.0),
+          child: CircularProgressIndicator(
+            color: AppColors.ascenso,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Título
+          Text(
+            'Expande tu conciencia',
+            style: AppTypography.kaushanTitle(
+              fontSize: 24,
+              color: AppColors.expansionAlquimica,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          
+          // Video promocional
+          _PortalesVideoPlayer(
+            key: ValueKey('clases_$_selectedTab'),
+            videoUrl: AppConstants.clasesVideoUrl,
+          ),
+          const SizedBox(height: 16),
+          
+          // Texto descriptivo
+          Text(
+            'Clases transformadoras para comprender, sanar e integrar.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          
+          // Buscador y filtro de favoritos
+          _buildClasesSearchBar(),
+          const SizedBox(height: 8),
+          
+          // Grid de clases
+          if (filteredClases.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  _showClasesFavoritesOnly 
+                      ? 'No tienes favoritos aún'
+                      : 'No se encontraron resultados',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+            )
+          else
+            _buildClasesGrid(filteredClases),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  /// Obtener Clases del contenido del usuario
+  List<ContentItem> _getClases(ContentProvider provider) {
+    return provider.all.where((item) {
+      final category = (item.category ?? '').toLowerCase();
+      final title = item.title.toLowerCase();
+      return category.contains('clase') || 
+             category.contains('clases') ||
+             title.contains('clase') ||
+             title.contains('clases');
+    }).toList();
+  }
+
+  /// Buscador y filtro de favoritos para Clases
+  Widget _buildClasesSearchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: TextField(
+              controller: _clasesSearchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar clases...',
+                hintStyle: AppTypography.ralewayRegular(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _showClasesFavoritesOnly = !_showClasesFavoritesOnly;
+            });
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _showClasesFavoritesOnly 
+                  ? AppColors.expansionAlquimica.withValues(alpha: 0.2)
+                  : AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _showClasesFavoritesOnly
+                    ? AppColors.expansionAlquimica
+                    : AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                '🤍',
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Filtrar items de clases según búsqueda y favoritos
+  List<ContentItem> _getFilteredClasesItems(List<ContentItem> items) {
+    var filtered = items;
+    
+    // Filtrar por búsqueda
+    final searchQuery = _clasesSearchController.text.toLowerCase().trim();
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        return item.title.toLowerCase().contains(searchQuery);
+      }).toList();
+    }
+    
+    // Filtrar por favoritos
+    if (_showClasesFavoritesOnly) {
+      filtered = filtered.where((item) {
+        return _favoriteIds.contains(item.id);
+      }).toList();
+    }
+    
+    return filtered;
+  }
+
+  /// Grid de clases
+  Widget _buildClasesGrid(List<ContentItem> items) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.8,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _buildClaseCard(item);
+      },
+    );
+  }
+
+  /// Card de clase con preview de video
+  Widget _buildClaseCard(ContentItem clase) {
+    final isFavorite = _favoriteIds.contains(clase.id);
+    
+    return GestureDetector(
+      onTap: () => _showClaseModal(clase),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.raizSagrada.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Preview del video (imagen o placeholder)
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Mostrar imagen si existe, sino placeholder de video
+                    clase.image != null && clase.image!.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: clase.image!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Color(0xFFB0E0E6),
+                                    Color(0xFF98D8C8),
+                                  ],
+                                ),
+                              ),
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.white,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => _buildVideoPlaceholder(),
+                          )
+                        : _buildVideoPlaceholder(),
+                    // Overlay con icono de play
+                    Container(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      child: const Center(
+                        child: Icon(
+                          Icons.play_circle_filled,
+                          color: Colors.white,
+                          size: 48,
+                        ),
+                      ),
+                    ),
+                    // Botón de favorito
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () async {
+                          await _favoritesService.toggleFavorite(clase.id);
+                          await _loadFavorites();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            isFavorite ? '🤍' : '🤍',
+                            style: TextStyle(
+                              fontSize: 20,
+                              color: isFavorite 
+                                  ? AppColors.expansionAlquimica
+                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Título y descripción
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    clase.title,
+                    style: AppTypography.ralewayBold(
+                      fontSize: 12,
+                      color: AppColors.raizSagrada,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (clase.description != null && clase.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _cleanDescription(clase.description!),
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 10,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Mostrar modal con video completo de clase
+  void _showClaseModal(ContentItem clase) {
+    if (clase.downloadUrl == null || clase.downloadUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No hay video disponible para ${clase.title}'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalContext) => Container(
+        height: MediaQuery.of(context).size.height * 0.9,
+        decoration: const BoxDecoration(
+          color: AppColors.origen,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Barra superior con botón cerrar
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      clase.title,
+                      style: AppTypography.ralewayBold(
+                        fontSize: 18,
+                        color: AppColors.raizSagrada,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: AppColors.raizSagrada,
+                    ),
+                    onPressed: () => Navigator.pop(modalContext),
+                  ),
+                ],
+              ),
+            ),
+            // Video player
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _TappingVideoPlayer(
+                  videoUrl: clase.downloadUrl!,
+                  title: clase.title,
+                ),
+              ),
+            ),
+            // Descripción si existe
+            if (clase.description != null && clase.description!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _cleanDescription(clase.description!),
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada.withValues(alpha: 0.8),
@@ -2959,12 +3554,29 @@ class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
 
   Future<void> _loadVideo() async {
     try {
+      // Verificar si es URL de Vimeo
+      final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
+      if (vimeoMatch != null) {
+        // Es Vimeo - usar VimeoService para obtener URL directa
+        final videoId = vimeoMatch.group(1)!;
+        final vimeoService = VimeoService();
+        final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
+        
+        if (directUrl == null || directUrl.isEmpty) {
+          setState(() {
+            _hasError = true;
+            _isLoading = false;
+          });
+          return;
+        }
+        
+        _controller = VideoPlayerController.networkUrl(Uri.parse(directUrl));
+      }
       // Verificar si es URL de YouTube
-      final youtubeMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
-      
-      if (youtubeMatch != null) {
+      else if (RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').hasMatch(widget.videoUrl)) {
+        final youtubeMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
         // Es YouTube - usar YoutubeExplode
-        final videoId = youtubeMatch.group(1)!;
+        final videoId = youtubeMatch!.group(1)!;
         final yt = YoutubeExplode();
         final manifest = await yt.videos.streams.getManifest(videoId);
         
@@ -3035,6 +3647,9 @@ class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    // Pausar el video antes de destruir los controladores
+    _chewieController?.pause();
+    _controller?.pause();
     _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();
@@ -3090,7 +3705,7 @@ class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
 class _SesionFenixVideoPlayer extends StatefulWidget {
   final String videoUrl;
 
-  const _SesionFenixVideoPlayer({required this.videoUrl});
+  const _SesionFenixVideoPlayer({super.key, required this.videoUrl});
 
   @override
   State<_SesionFenixVideoPlayer> createState() => _SesionFenixVideoPlayerState();
@@ -3202,6 +3817,9 @@ class _SesionFenixVideoPlayerState extends State<_SesionFenixVideoPlayer> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    // Pausar el video antes de destruir los controladores
+    _chewieController?.pause();
+    _controller?.pause();
     _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();
@@ -3257,7 +3875,7 @@ class _SesionFenixVideoPlayerState extends State<_SesionFenixVideoPlayer> {
 class _PortalesVideoPlayer extends StatefulWidget {
   final String videoUrl;
 
-  const _PortalesVideoPlayer({required this.videoUrl});
+  const _PortalesVideoPlayer({super.key, required this.videoUrl});
 
   @override
   State<_PortalesVideoPlayer> createState() => _PortalesVideoPlayerState();
@@ -3352,6 +3970,9 @@ class _PortalesVideoPlayerState extends State<_PortalesVideoPlayer> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    // Pausar el video antes de destruir los controladores
+    _chewieController?.pause();
+    _controller?.pause();
     _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();
@@ -3860,7 +4481,7 @@ class _PageSelectorDialogState extends State<_PageSelectorDialog> {
 class _ConsultaExpresVideoPlayer extends StatefulWidget {
   final String videoUrl;
 
-  const _ConsultaExpresVideoPlayer({required this.videoUrl});
+  const _ConsultaExpresVideoPlayer({super.key, required this.videoUrl});
 
   @override
   State<_ConsultaExpresVideoPlayer> createState() => _ConsultaExpresVideoPlayerState();
@@ -3972,6 +4593,9 @@ class _ConsultaExpresVideoPlayerState extends State<_ConsultaExpresVideoPlayer> 
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    // Pausar el video antes de destruir los controladores
+    _chewieController?.pause();
+    _controller?.pause();
     _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();
@@ -4027,7 +4651,7 @@ class _ConsultaExpresVideoPlayerState extends State<_ConsultaExpresVideoPlayer> 
 class _ThetaFenixVideoPlayer extends StatefulWidget {
   final String videoUrl;
 
-  const _ThetaFenixVideoPlayer({required this.videoUrl});
+  const _ThetaFenixVideoPlayer({super.key, required this.videoUrl});
 
   @override
   State<_ThetaFenixVideoPlayer> createState() => _ThetaFenixVideoPlayerState();
@@ -4140,6 +4764,9 @@ class _ThetaFenixVideoPlayerState extends State<_ThetaFenixVideoPlayer> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    // Pausar el video antes de destruir los controladores
+    _chewieController?.pause();
+    _controller?.pause();
     _chewieController?.dispose();
     _controller?.dispose();
     super.dispose();

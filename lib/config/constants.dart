@@ -31,11 +31,12 @@ class AppConstants {
   static const String hypnosisFenix = 'HIPNOSIS FÉNIX';
   static const String meditationsFenix = 'MEDITACIONES FÉNIX';
   static const String programasFenix = 'PROGRAMAS FÉNIX';
-  static const String thetaFenix = 'THETAFENIX';
-  static const String consultaExpres = 'PRIMEROS AUXILIOS';
+  static const String thetaFenix = 'THETAFÉNIX';
+  static const String consultaExpres = 'APOYO FÉNIX';
   static const String sesionFenix = 'SESIÓN FÉNIX';
   static const String sesionFenixNinos = 'SESIÓN FÉNIX NIÑOS';
   static const String tappings = 'TAPPINGS';
+  static const String clases = 'CLASES';
   
   // URLs de contenido
   static const String thetaFenixVideoUrl = 'https://www.youtube.com/embed/z85tZKc2ow0?si=NNqks4i5qJ3CMnES';
@@ -43,9 +44,11 @@ class AppConstants {
   static const String sesionFenixVideoUrl = 'https://www.youtube.com/embed/NHoxAWPx-g0?si=e3rh33sTpFnVv35V';
   static const String sesionFenixNinosVideoUrl = 'https://www.youtube.com/embed/Y65ap8CIKQM?si=rFvP9_o-R2bACjQC';
   static const String portalesVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
-  static const String hypnosisFenixVideoUrl = 'https://vimeo.com/1116471096?share=copy&fl=sv&fe=ci';
-  static const String meditationsFenixVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
+  static const String hypnosisFenixVideoUrl = 'https://vimeo.com/1116471075?share=copy&fl=sv&fe=ci';
+  static const String meditationsFenixVideoUrl = 'https://vimeo.com/1116471096?share=copy&fl=sv&fe=ci';
   static const String tappingsVideoUrl = 'https://vimeo.com/1116470945?share=copy&fl=sv&fe=ci';
+  static const String clasesVideoUrl = 'https://vimeo.com/1116470982?share=copy&fl=sv&fe=ci';
+  static const String programasFenixVideoUrl = 'https://vimeo.com/1116471150?share=copy&fl=sv&fe=ci';
   
   // WhatsApp
   static const String whatsappNumber = '5216141847863';

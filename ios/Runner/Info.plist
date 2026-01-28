@@ -103,6 +103,12 @@
 	</dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+		<string>https</string>
+		<string>http</string>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Esta aplicación reproduce contenido de audio. El permiso del micrófono es requerido por las librerías de audio para habilitar la reproducción a través de dispositivos Bluetooth y auriculares. No se graba ni se almacena ningún audio.</string>
 	<key>NSBluetoothUsageDescription</key>

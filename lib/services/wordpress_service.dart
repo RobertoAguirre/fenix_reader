@@ -834,6 +834,86 @@ class VimeoService {
     return _accessToken;
   }
 
+  /// Listar todos los videos de Vimeo del usuario
+  Future<List<Map<String, dynamic>>> listVimeoVideos() async {
+    try {
+      final accessToken = await getVimeoAccessToken();
+      List<Map<String, dynamic>> allVideos = [];
+      int page = 1;
+      bool hasMore = true;
+      
+      // Obtener todas las páginas (hasta 500 videos)
+      while (hasMore && page <= 10) {
+        final response = await http.get(
+          Uri.parse('$vimeoApiBase/me/videos?fields=uri,name,duration,link&per_page=100&page=$page'),
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+            'Content-Type': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            final data = decoded['data'] as List<dynamic>?;
+            if (data != null && data.isNotEmpty) {
+              final videos = data.map((video) {
+                final uri = video['uri'] as String? ?? '';
+                // Extraer ID del URI (formato: /videos/123456)
+                final videoId = uri.replaceAll('/videos/', '');
+                
+                return {
+                  'id': videoId,
+                  'title': video['name'] as String? ?? 'Sin título',
+                  'duration': video['duration'] as int? ?? 0,
+                  'link': video['link'] as String? ?? '',
+                  'uri': uri,
+                };
+              }).toList();
+              
+              allVideos.addAll(videos);
+              
+              // Verificar si hay más páginas
+              final paging = decoded['paging'] as Map<String, dynamic>?;
+              final next = paging?['next'] as String?;
+              hasMore = next != null;
+              page++;
+            } else {
+              hasMore = false;
+            }
+          }
+        } else {
+          debugPrint('❌ Error listando videos: ${response.statusCode} - ${response.body}');
+          hasMore = false;
+        }
+      }
+      
+      return allVideos;
+    } catch (e) {
+      debugPrint('❌ Error listando videos de Vimeo: $e');
+      return [];
+    }
+  }
+
+  /// Buscar videos específicos por nombre (para videos introductorios)
+  Future<Map<String, dynamic>?> findVideoByName(String searchName) async {
+    try {
+      final videos = await listVimeoVideos();
+      final lowerSearch = searchName.toLowerCase();
+      
+      for (var video in videos) {
+        final title = (video['title'] as String? ?? '').toLowerCase();
+        if (title.contains(lowerSearch)) {
+          return video;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error buscando video por nombre: $e');
+      return null;
+    }
+  }
+
   /// Obtener URL directa de video de Vimeo
   Future<String?> getVimeoVideoUrl(String videoId) async {
     try {
@@ -927,6 +1007,19 @@ class ContentItem {
     // Buscar URL de audio en múltiples campos posibles (como en FenixRn)
     String? downloadUrl;
     
+    // Debug: mostrar todos los campos relacionados con video/url para tappings
+    final title = (json['title'] as String? ?? json['post_title'] as String? ?? '').toLowerCase();
+    if (title.contains('tapping')) {
+      debugPrint('🔍 TAPPING detectado: ${json['title'] ?? json['post_title']}');
+      debugPrint('   Buscando campos de video...');
+      ['download_url', 'downloadUrl', 'download_urls', 'file', 'audio_url', 'media_url', 'video_url', 
+       'vimeo_url', 'vimeo_id', 'video_id', 'url', 'link'].forEach((field) {
+        if (json[field] != null) {
+          debugPrint('   ✅ $field: ${json[field]}');
+        }
+      });
+    }
+    
     // 1. download_url (singular, snake_case)
     if (json['download_url'] != null && json['download_url'].toString().isNotEmpty) {
       downloadUrl = json['download_url'] as String?;
@@ -953,6 +1046,40 @@ class ContentItem {
     // 6. media_url
     else if (json['media_url'] != null && json['media_url'].toString().isNotEmpty) {
       downloadUrl = json['media_url'] as String?;
+    }
+    // 7. video_url (para videos de Vimeo en tappings)
+    else if (json['video_url'] != null && json['video_url'].toString().isNotEmpty) {
+      downloadUrl = json['video_url'] as String?;
+    }
+    // 8. vimeo_url
+    else if (json['vimeo_url'] != null && json['vimeo_url'].toString().isNotEmpty) {
+      downloadUrl = json['vimeo_url'] as String?;
+    }
+    // 9. vimeo_id (convertir ID a URL)
+    else if (json['vimeo_id'] != null && json['vimeo_id'].toString().isNotEmpty) {
+      final vimeoId = json['vimeo_id'].toString();
+      downloadUrl = 'https://vimeo.com/$vimeoId';
+    }
+    // 10. video_id (convertir ID a URL)
+    else if (json['video_id'] != null && json['video_id'].toString().isNotEmpty) {
+      final videoId = json['video_id'].toString();
+      downloadUrl = 'https://vimeo.com/$videoId';
+    }
+    
+    // Convertir URL de "manage" a URL de visualización si es necesario
+    if (downloadUrl != null && downloadUrl.contains('vimeo.com/manage/videos/')) {
+      final manageMatch = RegExp(r'vimeo\.com/manage/videos/(\d+)').firstMatch(downloadUrl);
+      if (manageMatch != null) {
+        final videoId = manageMatch.group(1)!;
+        downloadUrl = 'https://vimeo.com/$videoId';
+        debugPrint('🔄 URL convertida de manage a visualización: $downloadUrl');
+      }
+    }
+    
+    if (title.contains('tapping') && downloadUrl != null) {
+      debugPrint('   ✅ downloadUrl asignado: $downloadUrl');
+    } else if (title.contains('tapping') && downloadUrl == null) {
+      debugPrint('   ❌ downloadUrl NO encontrado para tapping');
     }
     
     return ContentItem(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
@@ -22,11 +23,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
   
   final FavoritesService _favoritesService = FavoritesService();
   final Set<int> _favoriteIds = {};
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadFavorites();
+    _searchController.addListener(() {
+      setState(() {}); // Actualizar cuando cambia el texto de búsqueda
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadFavorites() async {
@@ -45,6 +56,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         children: [
           _buildHeader(),
           _buildTabs(),
+          const SizedBox(height: 8),
+          _buildSearchBar(),
           const SizedBox(height: 8),
           Expanded(
             child: _buildList(),
@@ -112,6 +125,55 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.raizSagrada.withValues(alpha: 0.2),
+          ),
+        ),
+        child: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Buscar...',
+            hintStyle: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.5),
+            ),
+            prefixIcon: Icon(
+              Icons.search,
+              color: AppColors.raizSagrada.withValues(alpha: 0.5),
+            ),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      Icons.clear,
+                      color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  )
+                : null,
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          style: AppTypography.ralewayRegular(
+            fontSize: 14,
+            color: AppColors.raizSagrada,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildList() {
     return Consumer<ContentProvider>(
       builder: (context, provider, _) {
@@ -124,9 +186,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
         final allItems = provider.all;
         
         // Filtrar según pestaña
-        final displayItems = _selectedTab == 1
+        var displayItems = _selectedTab == 1
             ? allItems.where((item) => _favoriteIds.contains(item.id)).toList()
             : allItems;
+        
+        // Filtrar por búsqueda
+        final searchQuery = _searchController.text.toLowerCase().trim();
+        if (searchQuery.isNotEmpty) {
+          displayItems = displayItems.where((item) {
+            final title = item.title.toLowerCase();
+            final description = (item.description ?? '').toLowerCase();
+            final category = (item.category ?? '').toLowerCase();
+            return title.contains(searchQuery) ||
+                   description.contains(searchQuery) ||
+                   category.contains(searchQuery);
+          }).toList();
+        }
 
         if (displayItems.isEmpty) {
           return _buildEmptyState();
@@ -143,6 +218,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               title: item.title,
               subtitle: item.type == ContentType.hipnosis ? 'Hipnosis' : 'Meditación',
               description: item.description,
+              image: item.image,
               isFavorite: isFavorite,
               onTap: () {
                 if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
@@ -188,16 +264,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Widget _buildEmptyState() {
-    final message = _selectedTab == 1
-        ? 'No tienes favoritos aún'
-        : 'Tu biblioteca está vacía';
+    final hasSearch = _searchController.text.isNotEmpty;
+    final message = hasSearch
+        ? 'No se encontraron resultados'
+        : (_selectedTab == 1
+            ? 'No tienes favoritos aún'
+            : 'Tu biblioteca está vacía');
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            _selectedTab == 1 ? Icons.favorite_border : Icons.folder_open_outlined,
+            hasSearch
+                ? Icons.search_off
+                : (_selectedTab == 1 ? Icons.favorite_border : Icons.folder_open_outlined),
             size: 64,
             color: AppColors.raizSagrada.withValues(alpha: 0.3),
           ),
@@ -220,6 +301,7 @@ class _LibraryListItem extends StatelessWidget {
   final String title;
   final String? subtitle;
   final String? description;
+  final String? image;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onFavoriteTap;
@@ -228,6 +310,7 @@ class _LibraryListItem extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.description,
+    this.image,
     this.isFavorite = false,
     this.onTap,
     this.onFavoriteTap,
@@ -249,7 +332,7 @@ class _LibraryListItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Thumbnail placeholder
+            // Thumbnail con imagen real o placeholder
             Container(
               width: 60,
               height: 60,
@@ -257,12 +340,39 @@ class _LibraryListItem extends StatelessWidget {
                 color: AppColors.raizSagrada.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Center(
-                child: Icon(
-                  Icons.image_outlined,
-                  color: AppColors.raizSagrada.withValues(alpha: 0.4),
-                  size: 24,
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: image != null && image!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: image!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: AppColors.raizSagrada.withValues(alpha: 0.15),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.ascenso,
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          color: AppColors.raizSagrada.withValues(alpha: 0.15),
+                          child: Center(
+                            child: Icon(
+                              Icons.image_outlined,
+                              color: AppColors.raizSagrada.withValues(alpha: 0.4),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.4),
+                          size: 24,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 16),
