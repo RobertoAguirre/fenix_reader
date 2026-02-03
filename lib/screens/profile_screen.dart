@@ -49,7 +49,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Bienvenida a tu espacio fénix.',
+                            'Tu espacio fénix.',
                             textAlign: TextAlign.center,
                             style: AppTypography.kaushanTitle(
                               fontSize: 24,

@@ -5,7 +5,7 @@ class AppConstants {
   
   // Textos de bienvenida
   static const String welcomeTitle = '¡Hola Bienvenido!';
-  static const String welcomeSubtitle = 'Bienvenida a tu espacio fénix.';
+  static const String welcomeSubtitle = 'Tu espacio fénix.';
   
   // Labels
   static const String login = 'Iniciar Sesión';
@@ -18,7 +18,7 @@ class AppConstants {
   
   // Menú
   static const String portals = 'Portales';
-  static const String myLibrary = 'Mi biblioteca HF y Med';
+  static const String myLibrary = 'Calendario y mensajes';
   static const String myAccount = 'Mi espacio Fénix';
   static const String termsConditions = 'Términos y condiciones';
   static const String contactUs = 'Contáctanos';
@@ -32,7 +32,7 @@ class AppConstants {
   static const String meditationsFenix = 'MEDITACIONES FÉNIX';
   static const String programasFenix = 'PROGRAMAS FÉNIX';
   static const String thetaFenix = 'THETAFÉNIX';
-  static const String consultaExpres = 'APOYO FÉNIX';
+  static const String consultaExpres = 'CONSULTA EXPRÉS';
   static const String sesionFenix = 'SESIÓN FÉNIX';
   static const String sesionFenixNinos = 'SESIÓN FÉNIX NIÑOS';
   static const String tappings = 'TAPPINGS';
@@ -51,7 +51,7 @@ class AppConstants {
   static const String programasFenixVideoUrl = 'https://vimeo.com/1116471150?share=copy&fl=sv&fe=ci';
   
   // WhatsApp
-  static const String whatsappNumber = '5216141847863';
+  static const String whatsappNumber = '526141309177';
   static const String whatsappConsultaMessage = '¡Hola! Me gustaría obtener más información.\n¡Gracias!👋';
 }
 

@@ -40,16 +40,10 @@ class _PortalScreenState extends State<PortalScreen> {
     AppConstants.meditationsFenix,
     AppConstants.tappings,
     AppConstants.clases,
-    AppConstants.thetaFenix,
     AppConstants.programasFenix,
     AppConstants.consultaExpres,
     AppConstants.sesionFenix,
   ];
-  
-  // Estado para THETAFENIX
-  List<Map<String, dynamic>> _thetaFenixSessions = [];
-  bool _isLoadingThetaFenix = false;
-  Map<String, dynamic>? _thetaFenixPageInfo;
   
   // Estado para HIPNOSIS FÉNIX
   final TextEditingController _hypnosisSearchController = TextEditingController();
@@ -98,7 +92,7 @@ class _PortalScreenState extends State<PortalScreen> {
   void _loadProgramsIfNeeded() {
     final authProvider = context.read<AuthProvider>();
     final email = authProvider.user?.email;
-    if (email != null && _selectedTab == 3) {
+    if (email != null && _selectedTab == 5) {
       context.read<ContentProvider>().loadUserPrograms(email);
     }
   }
@@ -222,7 +216,7 @@ class _PortalScreenState extends State<PortalScreen> {
     return Consumer<ContentProvider>(
       builder: (context, provider, _) {
         // Cargar programas si se selecciona la pestaña
-        if (_selectedTab == 3) {
+        if (_selectedTab == 5) {
           final authProvider = context.read<AuthProvider>();
           final email = authProvider.user?.email;
           if (email != null && provider.programs.isEmpty && !provider.isLoadingPrograms) {
@@ -232,18 +226,11 @@ class _PortalScreenState extends State<PortalScreen> {
           }
         }
         
-        // Cargar sesiones de THETAFENIX si se selecciona la pestaña
-        if (_selectedTab == 5 && _thetaFenixSessions.isEmpty && !_isLoadingThetaFenix) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _loadThetaFenixSessions();
-          });
-        }
-
         // Filtrar contenido según pestaña
         final items = _getFilteredItems(provider);
-        final isLoading = _selectedTab == 6 
+        final isLoading = _selectedTab == 5 
             ? provider.isLoadingPrograms 
-            : (_selectedTab == 5 ? _isLoadingThetaFenix : provider.isLoading);
+            : provider.isLoading;
 
         return GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
@@ -265,15 +252,13 @@ class _PortalScreenState extends State<PortalScreen> {
                               ? 'Tappings' 
                               : (_selectedTab == 4 
                                   ? 'Clases' 
-                                  : (_selectedTab == 5 
-                                      ? 'ThetaFénix'
+                                  : (_selectedTab == 5
+                                      ? 'Programas Fénix'
                                       : (_selectedTab == 6
-                                          ? 'Programas Fénix'
+                                          ? 'Consulta Exprés'
                                           : (_selectedTab == 7
-                                              ? 'Apoyo Fénix'
-                                              : (_selectedTab == 8
-                                                  ? 'Sesión Fénix'
-                                                  : _tabs[_selectedTab]))))))),
+                                              ? 'Sesión Fénix'
+                                              : _tabs[_selectedTab])))))),
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
                     fontSize: 24,
@@ -296,12 +281,10 @@ class _PortalScreenState extends State<PortalScreen> {
               else if (_selectedTab == 4)
                 _buildClasesContent(provider)
               else if (_selectedTab == 5)
-                _buildThetaFenixContent()
-              else if (_selectedTab == 6)
                 _buildProgramsList(provider.programs)
-              else if (_selectedTab == 7)
+              else if (_selectedTab == 6)
                 _buildConsultaExpresContent()
-              else if (_selectedTab == 8)
+              else if (_selectedTab == 7)
                 _buildSesionFenixContent()
               else if (items.isEmpty)
                 _buildEmptyState()
@@ -328,13 +311,11 @@ class _PortalScreenState extends State<PortalScreen> {
         return [];
       case 4: // CLASES - Se maneja separadamente
         return [];
-      case 5: // THETAFENIX - Se maneja separadamente
+      case 5: // PROGRAMAS FÉNIX - Se maneja separadamente
         return [];
-      case 6: // PROGRAMAS FÉNIX - Se maneja separadamente
+      case 6: // CONSULTA EXPRÉS - Se maneja separadamente
         return [];
-      case 7: // CONSULTA EXPRÉS - Se maneja separadamente
-        return [];
-      case 8: // SESIÓN FÉNIX - Se maneja separadamente
+      case 7: // SESIÓN FÉNIX - Se maneja separadamente
         return [];
       default:
         return provider.all;
@@ -362,6 +343,52 @@ class _PortalScreenState extends State<PortalScreen> {
           _PortalesVideoPlayer(
             key: ValueKey('programas_$_selectedTab'),
             videoUrl: AppConstants.programasFenixVideoUrl,
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: Text(
+              'Líneas de tiempo',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: Text(
+              'Tu vida se alinea a quien eliges ser ahora.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          Center(
+            child: GestureDetector(
+              onTap: _openWhatsAppApoyo,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Apoyo Fénix',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 18,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           
@@ -526,12 +553,10 @@ class _PortalScreenState extends State<PortalScreen> {
           } else if (index == 4) {
             tabColor = AppColors.expansionAlquimica; // CLASES: verde oliva
           } else if (index == 5) {
-            tabColor = AppColors.expansionAlquimica; // THETAFENIX: verde oliva
-          } else if (index == 6) {
             tabColor = AppColors.expansionAlquimica; // PROGRAMAS FÉNIX: verde oliva
-          } else if (index == 7) {
+          } else if (index == 6) {
             tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
-          } else if (index == 8) {
+          } else if (index == 7) {
             tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
           } else {
             tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
@@ -544,16 +569,12 @@ class _PortalScreenState extends State<PortalScreen> {
                 _stopAllVideos();
                 setState(() => _selectedTab = index);
                 // Cargar programas si se selecciona esa pestaña
-                if (index == 6) {
+                if (index == 5) {
                   final authProvider = context.read<AuthProvider>();
                   final email = authProvider.user?.email;
                   if (email != null) {
                     context.read<ContentProvider>().loadUserPrograms(email);
                   }
-                }
-                // Cargar sesiones de THETAFENIX si se selecciona esa pestaña
-                if (index == 5) {
-                  _loadThetaFenixSessions();
                 }
               },
               child: Container(
@@ -566,7 +587,7 @@ class _PortalScreenState extends State<PortalScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  _tabs[index],
+                  index == 0 ? 'PORTALES' : _tabs[index],
                   style: AppTypography.ralewayBold(
                     fontSize: 13,
                     color: AppColors.white,
@@ -1358,129 +1379,6 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Cargar sesiones de THETAFENIX
-  Future<void> _loadThetaFenixSessions() async {
-    if (_isLoadingThetaFenix) return;
-    
-    setState(() {
-      _isLoadingThetaFenix = true;
-    });
-
-    try {
-      final wpService = WordPressService();
-      final data = await wpService.getThetaFenixSessions();
-      
-      setState(() {
-        final sessionsData = data['sessions'];
-        if (sessionsData is List) {
-          _thetaFenixSessions = sessionsData
-              .whereType<Map<String, dynamic>>()
-              .toList();
-        } else {
-          _thetaFenixSessions = [];
-        }
-        final pageInfoData = data['pageInfo'];
-        _thetaFenixPageInfo = pageInfoData is Map<String, dynamic> ? pageInfoData : null;
-        _isLoadingThetaFenix = false;
-      });
-    } catch (e) {
-      debugPrint('❌ Error cargando sesiones de THETAFENIX: $e');
-      setState(() {
-        _isLoadingThetaFenix = false;
-      });
-    }
-  }
-
-  /// Construir contenido de THETAFENIX
-  Widget _buildThetaFenixContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Video de YouTube promocional
-          _buildThetaFenixVideo(),
-          const SizedBox(height: 20),
-          
-          // Información de la sesión
-          Text(
-            'Modalidad Online',
-            style: AppTypography.ralewayBold(
-              fontSize: 16,
-              color: AppColors.raizSagrada,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Duración: 90 min',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Hora: 8:30pm CDMX',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
-          // Lista de sesiones
-          if (_thetaFenixSessions.isEmpty)
-            Text(
-              'No hay sesiones disponibles en este momento',
-              style: AppTypography.ralewayRegular(
-                fontSize: 14,
-                color: AppColors.raizSagrada.withValues(alpha: 0.6),
-              ),
-              textAlign: TextAlign.center,
-            )
-          else
-            Wrap(
-              spacing: 12,
-              runSpacing: 18,
-              children: _thetaFenixSessions.map((session) {
-                return Container(
-                  width: (MediaQuery.of(context).size.width - 52) / 2,
-                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.raizSagrada.withValues(alpha: 0.1),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '${session['dayName']} ${_formatThetaDate(session['date'] as String)}',
-                        style: AppTypography.ralewayBold(
-                          fontSize: 16,
-                          color: AppColors.raizSagrada,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// Construir widget de video de YouTube para THETAFENIX
-  Widget _buildThetaFenixVideo() {
-    return _ThetaFenixVideoPlayer(
-      key: ValueKey('theta_$_selectedTab'),
-      videoUrl: AppConstants.thetaFenixVideoUrl,
-    );
-  }
-
   /// Construir contenido de CONSULTA EXPRÉS
   Widget _buildConsultaExpresContent() {
     return Padding(
@@ -1489,13 +1387,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Título
-          Text(
-            'Un espacio seguro y profesional',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Un espacio seguro y profesional',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           
@@ -1577,33 +1477,6 @@ class _PortalScreenState extends State<PortalScreen> {
     }
   }
 
-  /// Formatear fecha de THETAFENIX
-  String _formatThetaDate(String dateString) {
-    final months = {
-      'Enero': 'Ene',
-      'Febrero': 'Feb',
-      'Marzo': 'Mar',
-      'Abril': 'Abr',
-      'Mayo': 'May',
-      'Junio': 'Jun',
-      'Julio': 'Jul',
-      'Agosto': 'Ago',
-      'Septiembre': 'Sep',
-      'Octubre': 'Oct',
-      'Noviembre': 'Nov',
-      'Diciembre': 'Dic',
-    };
-
-    final parts = dateString.split(' ');
-    if (parts.length >= 2) {
-      final day = parts[0];
-      final month = parts[1];
-      final monthShort = months[month] ?? month;
-      return '$day $monthShort';
-    }
-    return dateString;
-  }
-
   void _onItemTap(ContentItem item) {
     if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1645,13 +1518,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            'Fénix alquimista',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Fénix alquimista',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           
@@ -1717,13 +1592,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            'Activa tu frecuencia',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Activa tu frecuencia',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           
@@ -1743,7 +1620,17 @@ class _PortalScreenState extends State<PortalScreen> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
+           // Texto descriptivo
+          Text(
+            'Para mayores resultados repetir en ciclos de 3-6-9-12-21 días seguidos.',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
           
           // Buscador y filtro de favoritos
           _buildHypnosisSearchBar(),
@@ -1767,7 +1654,7 @@ class _PortalScreenState extends State<PortalScreen> {
             )
           else
             _buildHypnosisGrid(filteredItems),
-          const SizedBox(height: 24),
+          const SizedBox(height: 22),
           
           // Botón Apoyo Fénix
           Center(
@@ -2138,13 +2025,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            'Alinéate en pocos minutos',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Alinéate en pocos minutos',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           
@@ -2156,13 +2045,26 @@ class _PortalScreenState extends State<PortalScreen> {
           const SizedBox(height: 16),
           
           // Texto descriptivo
-          Text(
-            'Inicia tu día alineándote en pocos minutos.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada,
+          Center(
+            child: Text(
+              'Inicia tu día alineándote en pocos minutos.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'Se escuchan de manera consciente y poniendo atención.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ),
           const SizedBox(height: 20),
           
@@ -2434,20 +2336,56 @@ class _PortalScreenState extends State<PortalScreen> {
         'titulo': 'Mensajes del universo',
         'descripcion': 'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
         'url': 'https://docs.google.com/document/d/1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk/export?format=pdf',
+        'coverUrl': 'https://drive.google.com/thumbnail?id=1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk&sz=w300',
       },
       {
         'id': '2',
         'titulo': 'Astrología',
         'descripcion': 'Descubre la energía de la luna y fases astrológicas para usar a tu favor',
         'url': 'https://docs.google.com/document/d/17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do/export?format=pdf',
+        'coverUrl': 'https://drive.google.com/thumbnail?id=17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do&sz=w300',
       },
       {
         'id': '3',
         'titulo': 'Emociones',
         'descripcion': 'Descubre el mensaje detrás de tus emociones y recuerda quién eres',
         'url': 'https://docs.google.com/document/d/1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60/export?format=pdf',
+        'coverUrl': 'https://drive.google.com/thumbnail?id=1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60&sz=w300',
       },
     ];
+  }
+
+  /// Portada o icono del documento
+  Widget _documentCover(Map<String, dynamic> document) {
+    final coverUrl = document['coverUrl'] as String?;
+    const size = 48.0;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: CachedNetworkImage(
+          imageUrl: coverUrl,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+            color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+            child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
+          ),
+          errorWidget: (_, __, ___) => Container(
+            color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+            child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
+          ),
+        ),
+      );
+    }
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
+    );
   }
 
   /// Construir card de documento
@@ -2468,18 +2406,9 @@ class _PortalScreenState extends State<PortalScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.picture_as_pdf_rounded,
-                  color: AppColors.expansionAlquimica,
-                  size: 28,
-                ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: _documentCover(document),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -2573,7 +2502,7 @@ class _PortalScreenState extends State<PortalScreen> {
             '¿Qué pasaría si dejaras de sobrevivir y empezaras a vivir?',
             style: AppTypography.kaushanTitle(
               fontSize: 20,
-              color: AppColors.raizSagrada,
+              color: AppColors.expansionAlquimica,
             ),
             textAlign: TextAlign.center,
           ),
@@ -2672,13 +2601,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            'Calma tu sistema nervioso',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Calma tu sistema nervioso',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           
@@ -3125,13 +3056,15 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            'Expande tu conciencia',
-            style: AppTypography.kaushanTitle(
-              fontSize: 24,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              'Expande tu conciencia',
+              style: AppTypography.kaushanTitle(
+                fontSize: 24,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
           
@@ -4523,177 +4456,6 @@ class _ConsultaExpresVideoPlayerState extends State<_ConsultaExpresVideoPlayer> 
       final manifest = await yt.videos.streams.getManifest(videoId);
       
       // Obtener el stream de mejor calidad disponible
-      VideoStreamInfo? streamInfo;
-      
-      // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
-      if (manifest.muxed.isNotEmpty) {
-        // Tomar el último stream muxed (suele ser el de mayor calidad)
-        streamInfo = manifest.muxed.last;
-      } else if (manifest.videoOnly.isNotEmpty) {
-        // Tomar el último stream videoOnly (suele ser el de mayor calidad)
-        streamInfo = manifest.videoOnly.last;
-      }
-      
-      if (streamInfo == null) {
-        setState(() {
-          _hasError = true;
-          _isLoading = false;
-        });
-        yt.close();
-        return;
-      }
-
-      // Crear controlador de video con la URL directa (streamInfo.url ya es Uri)
-      _controller = VideoPlayerController.networkUrl(streamInfo.url);
-
-      await _controller!.initialize();
-
-      _chewieController = ChewieController(
-        videoPlayerController: _controller!,
-        autoPlay: false,
-        looping: false,
-        aspectRatio: _controller!.value.aspectRatio,
-        showControls: true,
-        allowFullScreen: false, // Deshabilitar pantalla completa para evitar problemas de orientación
-        allowMuting: true,
-        allowPlaybackSpeedChanging: false,
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Text(
-              'Error al cargar el video',
-              style: AppTypography.ralewayRegular(
-                fontSize: 14,
-                color: AppColors.error,
-              ),
-            ),
-          );
-        },
-      );
-
-      yt.close();
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('❌ Error cargando video de YouTube: $e');
-      setState(() {
-        _hasError = true;
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    // Restaurar todas las orientaciones permitidas
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    // Pausar el video antes de destruir los controladores
-    _chewieController?.pause();
-    _controller?.pause();
-    _chewieController?.dispose();
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: 225,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: AppColors.raizSagrada.withValues(alpha: 0.1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.ascenso,
-                ),
-              )
-            : _hasError
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          color: AppColors.raizSagrada.withValues(alpha: 0.6),
-                          size: 48,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Error al cargar el video',
-                          style: AppTypography.ralewayRegular(
-                            fontSize: 14,
-                            color: AppColors.raizSagrada.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : _chewieController != null
-                    ? Chewie(controller: _chewieController!)
-                    : const SizedBox.shrink(),
-      ),
-    );
-  }
-}
-
-/// Widget para reproducir video de YouTube de forma nativa
-class _ThetaFenixVideoPlayer extends StatefulWidget {
-  final String videoUrl;
-
-  const _ThetaFenixVideoPlayer({super.key, required this.videoUrl});
-
-  @override
-  State<_ThetaFenixVideoPlayer> createState() => _ThetaFenixVideoPlayerState();
-}
-
-class _ThetaFenixVideoPlayerState extends State<_ThetaFenixVideoPlayer> {
-  VideoPlayerController? _controller;
-  ChewieController? _chewieController;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Forzar orientación portrait
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
-    _loadVideo();
-  }
-
-  Future<void> _loadVideo() async {
-    try {
-      // Extraer ID del video de YouTube de la URL embebida
-      final videoIdMatch = RegExp(r'youtube\.com/embed/([a-zA-Z0-9_-]+)').firstMatch(widget.videoUrl);
-      if (videoIdMatch == null) {
-        setState(() {
-          _hasError = true;
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final videoId = videoIdMatch.group(1)!;
-      
-      // Usar YoutubeExplode para obtener la URL directa del video
-      final yt = YoutubeExplode();
-      final manifest = await yt.videos.streams.getManifest(videoId);
-      
-      // Obtener el stream de mejor calidad disponible
-      // Muxed tiene audio+video pero limitado a 360p, videoOnly puede tener mejor calidad
       VideoStreamInfo? streamInfo;
       
       // Preferir muxed (audio+video) si está disponible, sino usar videoOnly
