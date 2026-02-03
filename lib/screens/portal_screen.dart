@@ -541,26 +541,9 @@ class _PortalScreenState extends State<PortalScreen> {
       child: Row(
         children: List.generate(_tabs.length, (index) {
           final isSelected = index == _selectedTab;
-          Color tabColor;
-          if (isSelected) {
-            tabColor = AppColors.raizSagrada; // Tab activo: fondo oscuro
-          } else if (index == 1) {
-            tabColor = AppColors.ascenso; // HIPNOSIS: azul-verde claro
-          } else if (index == 2) {
-            tabColor = AppColors.expansionAlquimica; // MEDITACIONES: verde oliva
-          } else if (index == 3) {
-            tabColor = AppColors.expansionAlquimica; // TAPPINGS: verde oliva
-          } else if (index == 4) {
-            tabColor = AppColors.expansionAlquimica; // CLASES: verde oliva
-          } else if (index == 5) {
-            tabColor = AppColors.expansionAlquimica; // PROGRAMAS FÉNIX: verde oliva
-          } else if (index == 6) {
-            tabColor = AppColors.expansionAlquimica; // CONSULTA EXPRÉS: verde oliva
-          } else if (index == 7) {
-            tabColor = AppColors.expansionAlquimica; // SESIÓN FÉNIX: verde oliva
-          } else {
-            tabColor = AppColors.ascenso; // Otras pestañas: azul-verde claro
-          }
+          final Color tabColor = isSelected
+              ? AppColors.raizSagrada
+              : (index.isEven ? AppColors.ascenso : AppColors.expansionAlquimica);
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: GestureDetector(
@@ -1410,8 +1393,8 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 20),
           
-          // Video promocional
-          _ConsultaExpresVideoPlayer(
+          // Video promocional (Vimeo, mismo reproductor que Portales)
+          _PortalesVideoPlayer(
             key: ValueKey('consulta_$_selectedTab'),
             videoUrl: AppConstants.consultaExpresVideoUrl,
           ),
@@ -2498,61 +2481,95 @@ class _PortalScreenState extends State<PortalScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Text(
-            '¿Qué pasaría si dejaras de sobrevivir y empezaras a vivir?',
-            style: AppTypography.kaushanTitle(
-              fontSize: 20,
-              color: AppColors.expansionAlquimica,
+          Center(
+            child: Text(
+              '¿Qué pasaría si dejaras de sobrevivir y empezaras a vivir?',
+              style: AppTypography.kaushanTitle(
+                fontSize: 20,
+                color: AppColors.expansionAlquimica,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           
-          // Video promocional
-          _SesionFenixVideoPlayer(
+          // Video promocional (Vimeo, mismo reproductor que Portales)
+          _PortalesVideoPlayer(
             key: ValueKey('sesion_$_selectedTab'),
             videoUrl: AppConstants.sesionFenixVideoUrl,
           ),
           const SizedBox(height: 20),
           
           // Descripción
-          Text(
-            'La transformación no duele.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+          Center(
+            child: Text(
+              'La transformación no duele.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada.withValues(alpha: 0.8),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          Text(
-            'Resistirse, sí.',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+          Center(
+            child: Text(
+              'Resistirse, sí.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada.withValues(alpha: 0.8),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
           
           // Información de la sesión
-          Text(
-            'Modalidad Online',
-            style: AppTypography.ralewayBold(
-              fontSize: 16,
-              color: AppColors.raizSagrada,
+          Center(
+            child: Text(
+              'Modalidad Online',
+              style: AppTypography.ralewayBold(
+                fontSize: 16,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          Text(
-            'Para personas mayores de 12 años',
-            style: AppTypography.ralewayRegular(
-              fontSize: 14,
-              color: AppColors.raizSagrada.withValues(alpha: 0.8),
+          Center(
+            child: Text(
+              'Para personas mayores de 12 años',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada.withValues(alpha: 0.8),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 24),
+          Center(
+            child: GestureDetector(
+              onTap: _openWhatsAppApoyo,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.ascenso,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Apoyo Fénix',
+                  style: AppTypography.kaushanTitle(
+                    fontSize: 18,
+                    color: AppColors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
