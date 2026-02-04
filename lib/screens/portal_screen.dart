@@ -1158,10 +1158,29 @@ class _PortalScreenState extends State<PortalScreen> {
     );
 
     try {
-      // Obtener detalles del programa
       final wpService = WordPressService();
-      final details = await wpService.getTutorCourseDetails(courseId);
-      
+      final title = ((program['post_title'] ?? program['title']) ?? '').toString().toLowerCase();
+      String? programId;
+      if (title.contains('riqueza') || title.contains('multidimensional')) {
+        programId = 'riqueza_multidimensional';
+      } else if (title.contains('amor') || title.contains('propio') || title.contains('21')) {
+        programId = 'amor_propio';
+      }
+
+      Map<String, dynamic>? details;
+      if (programId != null) {
+        details = await wpService.getProgramContentFromStaticJson(programId);
+        final topics = details?['topics'];
+        if (topics != null && topics is List && topics.isNotEmpty) {
+          details = {'topics': topics};
+        } else {
+          details = null;
+        }
+      }
+      if (details == null) {
+        details = await wpService.getTutorCourseDetails(courseId);
+      }
+
       if (!context.mounted) return;
       Navigator.pop(context); // Cerrar loading
 
@@ -1175,7 +1194,6 @@ class _PortalScreenState extends State<PortalScreen> {
         return;
       }
 
-      // Mostrar modal con el contenido del programa
       if (context.mounted) {
         _showProgramDetailsModal(program, details);
       }
@@ -1321,16 +1339,22 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
+  static bool _isAudioUrl(String url) {
+    final u = url.toLowerCase();
+    return u.endsWith('.mp3') || u.endsWith('.m4a') || u.endsWith('.aac') || u.endsWith('.ogg');
+  }
+
   Widget _buildProgramLesson(Map<String, dynamic> lesson, BuildContext modalContext) {
     final lessonTitle = lesson['post_title'] as String? ?? 'Sin título';
     final vimeoCode = lesson['vimeo_embed_code'] as String? ?? lesson['embed_code'] as String?;
     final postContent = lesson['post_content'] as String? ?? '';
     final isPdf = postContent.endsWith('.pdf');
     final hasVideo = vimeoCode != null && vimeoCode.isNotEmpty;
+    final isAudio = postContent.isNotEmpty && _isAudioUrl(postContent);
 
     return ListTile(
       leading: Icon(
-        isPdf ? Icons.picture_as_pdf : (hasVideo ? Icons.play_circle_outline : Icons.description),
+        isPdf ? Icons.picture_as_pdf : (hasVideo ? Icons.play_circle_outline : (isAudio ? Icons.audiotrack : Icons.description)),
         color: AppColors.ascenso,
       ),
       title: Text(
@@ -1340,23 +1364,33 @@ class _PortalScreenState extends State<PortalScreen> {
           color: AppColors.raizSagrada,
         ),
       ),
-      onTap: () {
+      onTap: () async {
         if (isPdf) {
-          // TODO: Abrir PDF con visor nativo
-          ScaffoldMessenger.of(modalContext).showSnackBar(
-            const SnackBar(
-              content: Text('Funcionalidad de PDF próximamente'),
-              backgroundColor: AppColors.ascenso,
-            ),
-          );
-        } else if (hasVideo) {
-          // TODO: Reproducir video de Vimeo nativamente
-          ScaffoldMessenger.of(modalContext).showSnackBar(
-            const SnackBar(
-              content: Text('Funcionalidad de video próximamente'),
-              backgroundColor: AppColors.ascenso,
-            ),
-          );
+          _openDocument({'titulo': lessonTitle, 'url': postContent});
+          return;
+        }
+        if (hasVideo) {
+          final idMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(vimeoCode!) ??
+              RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(vimeoCode!);
+          if (idMatch != null) {
+            final videoId = idMatch.group(1)!;
+            final vimeoService = VimeoService();
+            final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
+            if (directUrl != null && directUrl.isNotEmpty && mounted) {
+              showVideoPlayer(context: context, videoUrl: directUrl, title: lessonTitle);
+            } else if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('No se pudo cargar el video'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          }
+          return;
+        }
+        if (isAudio && mounted) {
+          showAudioPlayer(context: context, audioUrl: postContent, title: lessonTitle);
         }
       },
     );

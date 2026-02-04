@@ -442,6 +442,25 @@ class WordPressService {
     }
   }
 
+  /// Obtener contenido del programa desde JSON estático (misma fuente que FenixRn)
+  Future<Map<String, dynamic>?> getProgramContentFromStaticJson(String programId) async {
+    try {
+      final url = 'https://wendystaufert.com/wp-content/themes/astra/debug-data/$programId.json?t=${DateTime.now().millisecondsSinceEpoch}';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _defaultHeaders,
+      ).timeout(slowTimeout);
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo contenido estático del programa: $e');
+      return null;
+    }
+  }
+
   /// Obtener programas comprados del usuario
   Future<List<Map<String, dynamic>>> getUserPrograms(String email, {bool forceRefresh = false}) async {
     try {
