@@ -200,7 +200,7 @@ class _PortalScreenState extends State<PortalScreen> {
               return Text(
                 'Buenas tardes, $capitalizedName',
                 style: AppTypography.kaushanTitle(
-                  fontSize: 20,
+                  fontSize: 28,
                   color: AppColors.expansionAlquimica,
                 ),
                 textAlign: TextAlign.center,
@@ -249,15 +249,15 @@ class _PortalScreenState extends State<PortalScreen> {
                       : (_selectedTab == 2 
                           ? 'Meditaciones Fénix' 
                           : (_selectedTab == 3 
-                              ? 'Tappings' 
+                              ? 'Tappings Fénix' 
                               : (_selectedTab == 4 
-                                  ? 'Clases' 
+                                  ? 'Clases Fénix' 
                                   : (_selectedTab == 5
                                       ? 'Programas Fénix'
                                       : (_selectedTab == 6
-                                          ? 'Consulta Exprés'
+                                          ? 'Consulta Exprés Fénix'
                                           : (_selectedTab == 7
-                                              ? 'Sesión Fénix'
+                                              ? 'Sesión Fénix 1:1'
                                               : _tabs[_selectedTab])))))),
                   textAlign: TextAlign.center,
                   style: AppTypography.kaushanTitle(
@@ -290,6 +290,29 @@ class _PortalScreenState extends State<PortalScreen> {
                 _buildEmptyState()
               else
                 _buildContentList(items),
+              const SizedBox(height: 20),
+              Center(
+                child: GestureDetector(
+                  onTap: _openWhatsAppApoyo,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.ascenso,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Apoyo Fénix',
+                      style: AppTypography.kaushanTitle(
+                        fontSize: 18,
+                        color: AppColors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
             ],
           ),
@@ -368,30 +391,7 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
 
           const SizedBox(height: 20),
-          Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppApoyo,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Apoyo Fénix',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 18,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          
+
           // Grid de programas
           if (programs.isEmpty)
             _buildEmptyState()
@@ -611,7 +611,7 @@ class _PortalScreenState extends State<PortalScreen> {
         message = 'No tienes clases disponibles';
         break;
       case 5:
-        message = 'No hay sesiones disponibles en este momento';
+        message = 'Aún no tienes este contenido';
         break;
       case 6:
         message = 'No tienes programas en tu biblioteca';
@@ -1433,30 +1433,6 @@ class _PortalScreenState extends State<PortalScreen> {
             videoUrl: AppConstants.consultaExpresVideoUrl,
           ),
           const SizedBox(height: 24),
-          
-          // Botón Apoyo Fénix
-          Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppConsulta,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Apoyo Fénix',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 18,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1468,18 +1444,14 @@ class _PortalScreenState extends State<PortalScreen> {
       final message = Uri.encodeComponent(AppConstants.whatsappConsultaMessage);
       final whatsappUrl = 'https://api.whatsapp.com/send?phone=${AppConstants.whatsappNumber}&text=$message';
       final uri = Uri.parse(whatsappUrl);
-      
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('❌ Error abriendo WhatsApp: $e');
@@ -1568,31 +1540,6 @@ class _PortalScreenState extends State<PortalScreen> {
           // Lista de documentos
           _buildDocumentsList(),
           const SizedBox(height: 24),
-          
-          // Botón Apoyo Fénix
-          Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppApoyo,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Apoyo Fénix',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 16,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -1661,7 +1608,7 @@ class _PortalScreenState extends State<PortalScreen> {
                 child: Text(
                   _showFavoritesOnly 
                       ? 'No tienes favoritos aún'
-                      : 'No se encontraron resultados',
+                      : 'Aún no tienes este contenido',
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada.withValues(alpha: 0.6),
@@ -1672,31 +1619,6 @@ class _PortalScreenState extends State<PortalScreen> {
           else
             _buildHypnosisGrid(filteredItems),
           const SizedBox(height: 22),
-          
-          // Botón Apoyo Fénix
-          Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppApoyo,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Apoyo Fénix',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 16,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -1831,8 +1753,8 @@ class _PortalScreenState extends State<PortalScreen> {
       // Buscar videos introductorios específicos
       final introVideos = [
         {'name': 'Bienvenida', 'key': 'portales'},
-        {'name': 'Hipnosis Fénix', 'key': 'hypnosis'},
-        {'name': 'Meditaciones Fénix', 'key': 'meditations'},
+        {'name': 'Hipnosis', 'key': 'hypnosis'},
+        {'name': 'Meditaciones', 'key': 'meditations'},
         {'name': 'Tappings', 'key': 'tappings'},
         {'name': 'Clases Fénix', 'key': 'clases'},
         {'name': 'Programas Fénix', 'key': 'programas'},
@@ -2097,7 +2019,7 @@ class _PortalScreenState extends State<PortalScreen> {
                 child: Text(
                   _showMeditationsFavoritesOnly 
                       ? 'No tienes favoritos aún'
-                      : 'No se encontraron resultados',
+                      : 'Aún no tienes este contenido',
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada.withValues(alpha: 0.6),
@@ -2481,18 +2403,14 @@ class _PortalScreenState extends State<PortalScreen> {
       final message = Uri.encodeComponent('¡Hola! Me gustaría obtener más información.\n¡Gracias!👋');
       final whatsappUrl = 'https://api.whatsapp.com/send?phone=${AppConstants.whatsappNumber}&text=$message';
       final uri = Uri.parse(whatsappUrl);
-      
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir WhatsApp. Por favor, verifica que tengas WhatsApp instalado.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     } catch (e) {
       debugPrint('❌ Error abriendo WhatsApp: $e');
@@ -2581,29 +2499,6 @@ class _PortalScreenState extends State<PortalScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          Center(
-            child: GestureDetector(
-              onTap: _openWhatsAppApoyo,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.ascenso,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Apoyo Fénix',
-                  style: AppTypography.kaushanTitle(
-                    fontSize: 18,
-                    color: AppColors.white,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -2694,7 +2589,7 @@ class _PortalScreenState extends State<PortalScreen> {
                 child: Text(
                   _showTappingsFavoritesOnly 
                       ? 'No tienes favoritos aún'
-                      : 'No se encontraron resultados',
+                      : 'Aún no tienes este contenido',
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada.withValues(alpha: 0.6),
@@ -3149,7 +3044,7 @@ class _PortalScreenState extends State<PortalScreen> {
                 child: Text(
                   _showClasesFavoritesOnly 
                       ? 'No tienes favoritos aún'
-                      : 'No se encontraron resultados',
+                      : 'Aún no tienes este contenido',
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada.withValues(alpha: 0.6),

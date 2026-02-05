@@ -29,8 +29,8 @@ class AppConstants {
   static const String favorites = 'Mis Favoritas';
   static const String home = 'INICIO';
   static const String hypnosisFenix = 'HIPNOSIS FÉNIX';
-  static const String meditationsFenix = 'MEDITACIONES FÉNIX';
-  static const String programasFenix = 'PROGRAMAS FÉNIX';
+  static const String meditationsFenix = 'MEDITACIONES';
+  static const String programasFenix = 'PROGRAMAS';
   static const String thetaFenix = 'THETAFÉNIX';
   static const String consultaExpres = 'CONSULTA EXPRÉS';
   static const String sesionFenix = 'SESIÓN FÉNIX';

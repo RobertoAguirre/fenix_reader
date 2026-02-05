@@ -266,7 +266,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget _buildEmptyState() {
     final hasSearch = _searchController.text.isNotEmpty;
     final message = hasSearch
-        ? 'No se encontraron resultados'
+        ? 'Aún no tienes este contenido'
         : (_selectedTab == 1
             ? 'No tienes favoritos aún'
             : 'Tu biblioteca está vacía');
