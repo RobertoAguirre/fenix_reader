@@ -96,34 +96,63 @@ class WordPressService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         
-        List<dynamic> data;
+        List<dynamic> purchasesData;
+        List<dynamic> membershipData = [];
+        
         if (decoded is List) {
-          data = decoded;
+          purchasesData = decoded;
         } else if (decoded is Map<String, dynamic>) {
-          data = decoded['purchases'] as List<dynamic>? ??
+          purchasesData = decoded['purchases'] as List<dynamic>? ??
                  decoded['items'] as List<dynamic>? ??
                  decoded['data'] as List<dynamic>? ??
                  [];
+          
+          // Guardar estado de membership_allowed
+          final membershipAllowed = decoded['membership_allowed'] == true;
+          await _cacheService.saveMembershipAllowed(email, membershipAllowed);
+          if (membershipAllowed) {
+            debugPrint('🔑 Usuario tiene membresía activa');
+          }
+          
+          // Leer contenido de membresía si existe
+          if (decoded['membership_content'] is List) {
+            membershipData = decoded['membership_content'] as List<dynamic>;
+            debugPrint('🔑 Contenido de membresía: ${membershipData.length} items');
+          }
         } else {
-          data = [];
+          purchasesData = [];
         }
         
-        // Guardar en caché
-        await _cacheService.saveCachedPurchases(email, data);
+        // Combinar compras individuales + contenido de membresía
+        // Usar Set de product_id para evitar duplicados
+        final Set<int> seenIds = {};
+        final List<dynamic> mergedData = [];
         
-        debugPrint('✅ Contenido del usuario: ${data.length} items');
-        
-        // Debug: mostrar campos disponibles en el primer item
-        if (data.isNotEmpty) {
-          final firstItem = data.first as Map<String, dynamic>;
-          debugPrint('📋 Campos disponibles en el primer item:');
-          firstItem.keys.forEach((key) {
-            final value = firstItem[key];
-            debugPrint('  - $key: ${value != null ? (value.toString().length > 100 ? value.toString().substring(0, 100) + '...' : value.toString()) : 'null'}');
-          });
+        for (final item in purchasesData) {
+          if (item is Map<String, dynamic>) {
+            final pid = item['product_id'] as int? ?? item['id'] as int? ?? 0;
+            if (seenIds.add(pid)) {
+              mergedData.add(item);
+            }
+          }
         }
         
-        return data.map((item) => ContentItem.fromJson(item as Map<String, dynamic>)).toList();
+        for (final item in membershipData) {
+          if (item is Map<String, dynamic>) {
+            final pid = item['product_id'] as int? ?? item['id'] as int? ?? 0;
+            if (seenIds.add(pid)) {
+              mergedData.add(item);
+            }
+          }
+        }
+        
+        // Guardar en caché la lista unificada
+        await _cacheService.saveCachedPurchases(email, mergedData);
+        
+        final dupsRemoved = (purchasesData.length + membershipData.length) - mergedData.length;
+        debugPrint('✅ Contenido del usuario: ${mergedData.length} items (${purchasesData.length} compras + ${membershipData.length} membresía, $dupsRemoved duplicados removidos)');
+        
+        return mergedData.map((item) => ContentItem.fromJson(item as Map<String, dynamic>)).toList();
       } else {
         debugPrint('⚠️ Error obteniendo contenido: ${response.statusCode}');
         // Intentar usar caché como fallback
@@ -556,7 +585,23 @@ class WordPressService {
         }
       }
       
-      debugPrint('✅ Programas comprados del usuario: ${purchasedPrograms.length}');
+      // Si el usuario tiene membresía activa, darle acceso a todos los programas
+      if (purchasedPrograms.length < allPrograms.length) {
+        final hasMembership = await _cacheService.getMembershipAllowed(email);
+        if (hasMembership) {
+          debugPrint('🔑 Membresía activa: dando acceso a todos los programas');
+          final purchasedIds = purchasedPrograms.map((p) => p['ID'] ?? p['id']).toSet();
+          for (final program in allPrograms) {
+            final courseId = program['ID'] ?? program['id'];
+            if (!purchasedIds.contains(courseId)) {
+              purchasedPrograms.add(program);
+              debugPrint('🔑 Acceso por membresía: ${program['post_title'] ?? program['title']}');
+            }
+          }
+        }
+      }
+
+      debugPrint('✅ Programas del usuario: ${purchasedPrograms.length}');
       return purchasedPrograms;
     } catch (e) {
       debugPrint('❌ Error obteniendo programas del usuario: $e');

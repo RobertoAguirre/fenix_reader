@@ -276,6 +276,60 @@ class CacheService {
   }
 
   // ============================================
+  // CACHÉ DE ESTADO DE MEMBRESÍA
+  // ============================================
+
+  static const String _membershipAllowedPrefix = 'fenix_membership_allowed_';
+
+  /// Guardar estado de membership_allowed
+  Future<void> saveMembershipAllowed(String email, bool allowed) async {
+    try {
+      final prefs = await _prefs;
+      final cacheKey = '$_membershipAllowedPrefix$email';
+      final cacheData = {
+        'data': allowed,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      await prefs.setString(cacheKey, jsonEncode(cacheData));
+    } catch (e) {
+      debugPrint('❌ Error guardando estado de membresía: $e');
+    }
+  }
+
+  /// Obtener estado de membership_allowed
+  Future<bool> getMembershipAllowed(String email) async {
+    try {
+      final prefs = await _prefs;
+      final cacheKey = '$_membershipAllowedPrefix$email';
+      final cached = prefs.getString(cacheKey);
+
+      if (cached != null) {
+        final decoded = jsonDecode(cached) as Map<String, dynamic>;
+        final timestamp = decoded['timestamp'] as int;
+        final now = DateTime.now().millisecondsSinceEpoch;
+
+        if (now - timestamp < purchasesCacheDuration * 60 * 1000) {
+          return decoded['data'] as bool? ?? false;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('❌ Error obteniendo estado de membresía: $e');
+      return false;
+    }
+  }
+
+  /// Limpiar caché de estado de membresía
+  Future<void> clearMembershipAllowed(String email) async {
+    try {
+      final prefs = await _prefs;
+      await prefs.remove('$_membershipAllowedPrefix$email');
+    } catch (e) {
+      debugPrint('❌ Error limpiando estado de membresía: $e');
+    }
+  }
+
+  // ============================================
   // RATE LIMITING
   // ============================================
 
