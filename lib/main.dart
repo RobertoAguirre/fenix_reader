@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
 import 'providers/content_provider.dart';
@@ -11,6 +11,8 @@ import 'services/iap_service.dart';
 import 'services/audio_cache_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+
+const String _oneSignalAppId = 'f2561d52-ac45-4886-92fb-b18f99422515';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,10 @@ void main() {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+
+  // OneSignal: inicializar y solicitar permiso de notificaciones
+  OneSignal.initialize(_oneSignalAppId);
+  OneSignal.Notifications.requestPermission(true);
 
   // Inicializar IAP SDK (solo para cumplir requisito de App Store)
   IAPService().initialize();
@@ -85,10 +91,10 @@ class _AppNavigatorState extends State<AppNavigator> {
       final userEmail = authProvider.user?.email;
       debugPrint('✅ Sesión válida encontrada para: $userEmail');
       
-      // Cargar contenido del usuario si hay email
       if (userEmail != null) {
         debugPrint('📦 Cargando contenido del usuario...');
         context.read<ContentProvider>().loadUserContent(userEmail);
+        OneSignal.login(userEmail);
       }
       
       setState(() => _isLoggedIn = true);
@@ -100,12 +106,15 @@ class _AppNavigatorState extends State<AppNavigator> {
   void _handleLoginSuccess() {
     debugPrint('✅ Login exitoso, navegando a HomeScreen');
     if (mounted) {
+      final email = context.read<AuthProvider>().user?.email;
+      if (email != null) OneSignal.login(email);
       setState(() => _isLoggedIn = true);
     }
   }
 
   void _handleLogout() {
     if (mounted) {
+      OneSignal.logout();
       setState(() => _isLoggedIn = false);
     }
   }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'cache_service.dart';
+import '../models/daily_message.dart';
 
 /// Servicio para consumir WordPress REST API
 class WordPressService {
@@ -857,6 +858,59 @@ class WordPressService {
     });
     
     return sessions;
+  }
+
+  /// Token para endpoint push-log (calendario de mensajes diarios)
+  static const String _pushLogToken = 'MI_TOKEN_SECRETO_PUSHLOG';
+
+  /// Obtener registro de pushes (mensajes diarios) para un rango de fechas
+  Future<List<DailyMessage>> getPushLog(DateTime from, DateTime to) async {
+    final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+    final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+    final uri = Uri.parse('$baseUrl/push-log?from=$fromStr&to=$toStr');
+    final headers = {
+      ..._defaultHeaders,
+      'x-fenix-token': _pushLogToken,
+    };
+    try {
+      final response = await http.get(uri, headers: headers).timeout(normalTimeout);
+      if (response.statusCode != 200) return [];
+      final body = jsonDecode(response.body);
+      if (body is! List) return [];
+      final list = <DailyMessage>[];
+      for (final e in body) {
+        if (e is! Map<String, dynamic>) continue;
+        final sentAt = e['sent_at'] as String?;
+        if (sentAt == null || sentAt.isEmpty) continue;
+        final date = _parseSentAt(sentAt);
+        if (date == null) continue;
+        list.add(DailyMessage(
+          date: date,
+          title: e['title'] as String? ?? '',
+          message: e['message'] as String? ?? '',
+        ));
+      }
+      return list;
+    } catch (e) {
+      debugPrint('❌ getPushLog: $e');
+      return [];
+    }
+  }
+
+  static DateTime? _parseSentAt(String sentAt) {
+    try {
+      final parts = sentAt.split(' ');
+      if (parts.isEmpty) return null;
+      final dateParts = parts[0].split('-');
+      if (dateParts.length != 3) return null;
+      final y = int.tryParse(dateParts[0]) ?? 0;
+      final m = int.tryParse(dateParts[1]) ?? 0;
+      final d = int.tryParse(dateParts[2]) ?? 0;
+      if (y == 0 || m == 0 || d == 0) return null;
+      return DateTime(y, m, d);
+    } catch (_) {
+      return null;
+    }
   }
 }
 
