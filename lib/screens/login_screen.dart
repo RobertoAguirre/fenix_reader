@@ -289,15 +289,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.origen,
-      body: Column(
-        children: [
-          // Header marrón
-          _buildHeader(),
-          // Cuerpo crema con formulario
-          Expanded(
-            child: _buildBody(),
-          ),
-        ],
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: Column(
+          children: [
+            // Header marrón
+            _buildHeader(),
+            // Cuerpo crema con formulario
+            Expanded(
+              child: _buildBody(),
+            ),
+          ],
+        ),
       ),
       // Barra de navegación oculta cuando no está logueado
     );

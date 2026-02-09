@@ -39,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _buildDrawer(context),
+      // drawer: _buildDrawer(context), // Deshabilitado; conservado por si el cliente lo requiere
       body: _screens[_currentIndex],
       bottomNavigationBar: FenixBottomNav(
         currentIndex: _currentIndex,
