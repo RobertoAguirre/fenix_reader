@@ -10,6 +10,7 @@ import 'providers/program_provider.dart';
 import 'services/iap_service.dart';
 import 'services/audio_cache_service.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 
 const String _oneSignalAppId = 'f2561d52-ac45-4886-92fb-b18f99422515';
@@ -70,6 +71,7 @@ class AppNavigator extends StatefulWidget {
 
 class _AppNavigatorState extends State<AppNavigator> {
   bool _isLoggedIn = false;
+  bool _showRegister = false;
 
   @override
   void initState() {
@@ -124,6 +126,14 @@ class _AppNavigatorState extends State<AppNavigator> {
     if (_isLoggedIn) {
       return const HomeScreen();
     }
-    return LoginScreen(onLoginSuccess: _handleLoginSuccess);
+    if (_showRegister) {
+      return RegisterScreen(
+        onGoToLogin: () => setState(() => _showRegister = false),
+      );
+    }
+    return LoginScreen(
+      onLoginSuccess: _handleLoginSuccess,
+      onGoToRegister: () => setState(() => _showRegister = true),
+    );
   }
 }

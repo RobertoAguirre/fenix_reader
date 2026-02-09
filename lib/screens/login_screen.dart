@@ -9,8 +9,9 @@ import '../widgets/fenix_logo.dart';
 /// Pantalla de Login
 class LoginScreen extends StatefulWidget {
   final VoidCallback? onLoginSuccess;
+  final VoidCallback? onGoToRegister;
 
-  const LoginScreen({super.key, this.onLoginSuccess});
+  const LoginScreen({super.key, this.onLoginSuccess, this.onGoToRegister});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -87,6 +88,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return cleaned.isNotEmpty ? cleaned : 'Error al iniciar sesión';
+  }
+
+  void _showForgotPasswordSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ForgotPasswordSheetContent(
+        onClose: () => Navigator.of(ctx).pop(),
+      ),
+    );
   }
 
   void _showPrivacyPolicyModal(BuildContext context) {
@@ -391,7 +403,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: () => _showForgotPasswordSheet(context),
+                child: Text(
+                  '¿Olvidaste tu contraseña?',
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 13,
+                    color: AppColors.raizSagrada.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               // Botón Acceder
               SizedBox(
                 width: double.infinity,
@@ -432,6 +455,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ],
+              if (widget.onGoToRegister != null) ...[
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: widget.onGoToRegister,
+                  child: Text(
+                    '${AppConstants.noAccount} ${AppConstants.registerNow}',
+                    style: AppTypography.ralewayRegular(
+                      fontSize: 14,
+                      color: AppColors.raizSagrada,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -454,6 +490,172 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Contenido del sheet de recuperar contraseña. Copy neutro.
+class _ForgotPasswordSheetContent extends StatefulWidget {
+  final VoidCallback onClose;
+
+  const _ForgotPasswordSheetContent({required this.onClose});
+
+  @override
+  State<_ForgotPasswordSheetContent> createState() => _ForgotPasswordSheetContentState();
+}
+
+class _ForgotPasswordSheetContentState extends State<_ForgotPasswordSheetContent> {
+  final _emailController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  bool _success = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() {
+        _error = 'Ingresa tu correo electrónico';
+        _success = false;
+      });
+      return;
+    }
+    if (!email.contains('@') || !email.contains('.')) {
+      setState(() {
+        _error = 'Ingresa un correo electrónico válido';
+        _success = false;
+      });
+      return;
+    }
+    setState(() {
+      _error = null;
+      _loading = true;
+      _success = false;
+    });
+    try {
+      await context.read<AuthProvider>().requestPasswordReset(email);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _success = true;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e is Exception ? e.toString().replaceFirst('Exception: ', '') : 'Error de conexión. Intenta de nuevo.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.origen,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 24,
+        bottom: MediaQuery.of(context).padding.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Recuperar contraseña',
+                style: AppTypography.kaushanTitle(
+                  fontSize: 22,
+                  color: AppColors.raizSagrada,
+                ),
+              ),
+              IconButton(
+                onPressed: widget.onClose,
+                icon: Icon(Icons.close, color: AppColors.raizSagrada),
+              ),
+            ],
+          ),
+          if (!_success) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Ingresa tu correo electrónico y te enviaremos un enlace seguro para restablecer tu contraseña.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada.withValues(alpha: 0.85),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              decoration: InputDecoration(
+                hintText: AppConstants.emailHint,
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: AppTypography.ralewayRegular(
+                  fontSize: 13,
+                  color: AppColors.error,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _submit,
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.white,
+                        ),
+                      )
+                    : const Text('Enviar enlace de recuperación'),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 16),
+            Icon(Icons.check_circle, color: AppColors.ascenso, size: 56),
+            const SizedBox(height: 12),
+            Text(
+              'Hemos enviado un enlace de recuperación a tu correo. Revisa tu bandeja de entrada y sigue las instrucciones para restablecer tu contraseña.',
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.onClose,
+                child: const Text('Entendido'),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

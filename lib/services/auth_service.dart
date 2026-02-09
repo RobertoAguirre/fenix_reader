@@ -7,9 +7,12 @@ import '../models/user.dart';
 /// Servicio de autenticación con WordPress JWT
 class AuthService {
   static const String _baseUrl = 'https://wendystaufert.com/wp-json';
+  static const String _customApiUrl = 'https://wendystaufert.com/wp-json/custom/v1';
+  static const String _fenixApiUrl = 'https://wendystaufert.com/wp-json/fenix/v1';
+  static const String _registerAppId = 'com.fenix.app.v1';
   static const String _tokenKey = 'jwt_token';
   static const String _userKey = 'user_data';
-  
+
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
   User? _currentUser;
@@ -138,6 +141,172 @@ class AuthService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Obtener credenciales de registro desde el backend
+  Future<Map<String, String>> _getRegistrationCredentials() async {
+    final response = await http.get(
+      Uri.parse('$_customApiUrl/register-credentials'),
+      headers: {
+        'X-App-ID': _registerAppId,
+        'Content-Type': 'application/json',
+      },
+    );
+    if (response.statusCode != 200) {
+      throw Exception('No se pudieron obtener las credenciales de registro');
+    }
+    final data = jsonDecode(response.body);
+    if (data is! Map || data['success'] != true) {
+      throw Exception('No se pudieron obtener las credenciales de registro');
+    }
+    final endpoint = data['endpoint'] as String?;
+    final apiKey = data['api_key'] as String?;
+    if (endpoint == null || endpoint.isEmpty || apiKey == null || apiKey.isEmpty) {
+      throw Exception('No se pudieron obtener las credenciales de registro');
+    }
+    return {'endpoint': endpoint, 'api_key': apiKey};
+  }
+
+  static String _stripHtml(String? text) {
+    if (text == null || text.isEmpty) return '';
+    return text
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .trim();
+  }
+
+  /// Mensaje de error neutro para el usuario (sin referencias a ventas)
+  static String _mapRegisterError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('email ya está registrado') || lower.contains('usuario o email ya existe')) {
+      return 'El correo ya está registrado. Inicia sesión o usa otro correo.';
+    }
+    if (lower.contains('contraseña') && lower.contains('8')) {
+      return 'La contraseña debe tener al menos 8 caracteres.';
+    }
+    if (lower.contains('email inválido') || lower.contains('invalid email')) {
+      return 'El formato del correo no es válido.';
+    }
+    if (lower.contains('faltan campos')) {
+      return 'Completa todos los campos requeridos.';
+    }
+    if (lower.contains('origen no permitido') || lower.contains('no autorizado')) {
+      return 'Acceso no autorizado.';
+    }
+    if (lower.contains('api key') || lower.contains('autenticación')) {
+      return 'Error de conexión. Inténtalo más tarde.';
+    }
+    if (lower.contains('demasiados intentos') || lower.contains('rate limit')) {
+      return 'Demasiados intentos. Espera un momento.';
+    }
+    return _stripHtml(message).isEmpty ? 'Error al crear la cuenta. Inténtalo de nuevo.' : _stripHtml(message);
+  }
+
+  /// Registro de usuario nuevo (mismo backend que FenixRn)
+  Future<AuthResult> register({
+    required String username,
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+  }) async {
+    try {
+      debugPrint('🔐 AuthService: Obteniendo credenciales de registro');
+      final credentials = await _getRegistrationCredentials();
+      final endpoint = credentials['endpoint']!;
+      final apiKey = credentials['api_key']!;
+
+      final body = jsonEncode({
+        'username': username,
+        'email': email,
+        'password': password,
+        'first_name': firstName,
+        'last_name': lastName,
+      });
+
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+          'X-App-ID': _registerAppId,
+        },
+        body: body,
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['success'] == true) {
+          debugPrint('✅ AuthService: Registro exitoso');
+          return AuthResult.success(User(id: 0, email: email, displayName: '$firstName $lastName'));
+        }
+      }
+
+      String errorMessage = response.body;
+      try {
+        final data = jsonDecode(response.body);
+        if (data is Map && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      } catch (_) {}
+      errorMessage = _stripHtml(errorMessage);
+      final lower = errorMessage.toLowerCase();
+
+      if (lower.contains('ya existe') || lower.contains('already exists')) {
+        try {
+          debugPrint('🔐 AuthService: Intentando convertir invitado');
+          final convertResponse = await http.post(
+            Uri.parse('$_fenixApiUrl/convertir-invitado'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              'first_name': firstName,
+              'last_name': lastName,
+            }),
+          );
+          if (convertResponse.statusCode == 200) {
+            final convertData = jsonDecode(convertResponse.body);
+            if (convertData is Map && convertData['success'] == true) {
+              debugPrint('✅ AuthService: Cuenta convertida exitosamente');
+              return AuthResult.success(User(id: 0, email: email, displayName: '$firstName $lastName'));
+            }
+          }
+        } catch (e) {
+          debugPrint('❌ AuthService: Error convertir invitado: $e');
+        }
+      }
+
+      return AuthResult.error(_mapRegisterError(errorMessage));
+    } catch (e) {
+      debugPrint('❌ AuthService: Excepción en registro: $e');
+      return AuthResult.error('Error de conexión. Inténtalo de nuevo.');
+    }
+  }
+
+  /// Solicitar recuperación de contraseña (mismo endpoint que FenixRn: wp-login.php?action=lostpassword)
+  Future<void> requestPasswordReset(String email) async {
+    final uri = Uri.parse('https://wendystaufert.com/wp-login.php?action=lostpassword');
+    final body = 'user_login=${Uri.encodeComponent(email)}&redirect_to=&wp-submit=Get+New+Password';
+    final response = await http.post(
+      uri,
+      headers: {
+        'User-Agent': 'Flutter/FenixReader',
+        'Origin': 'https://wendystaufert.com',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: body,
+    );
+    if (response.statusCode == 404) {
+      throw Exception('No existe una cuenta con ese correo electrónico');
+    }
+    if (response.statusCode == 429) {
+      throw Exception('Demasiados intentos. Intenta de nuevo en unos minutos');
+    }
+    if (response.statusCode >= 400) {
+      throw Exception('Error al procesar la solicitud. Intenta de nuevo');
     }
   }
 }

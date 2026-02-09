@@ -48,6 +48,36 @@ class AuthProvider extends ChangeNotifier {
     return result.success;
   }
 
+  /// Registro de usuario nuevo
+  Future<bool> register({
+    required String username,
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    final result = await _authService.register(
+      username: username,
+      email: email,
+      password: password,
+      firstName: firstName,
+      lastName: lastName,
+    );
+
+    _isLoading = false;
+    if (result.success) {
+      _error = null;
+    } else {
+      _error = result.error;
+    }
+    notifyListeners();
+    return result.success;
+  }
+
   /// Logout - Limpia autenticación y notifica
   Future<void> logout() async {
     debugPrint('🚪 AuthProvider: Iniciando logout');
@@ -56,6 +86,11 @@ class AuthProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     debugPrint('✅ AuthProvider: Logout completado');
+  }
+
+  /// Solicitar recuperación de contraseña (enlace al correo)
+  Future<void> requestPasswordReset(String email) async {
+    await _authService.requestPasswordReset(email);
   }
 
   /// Limpiar error

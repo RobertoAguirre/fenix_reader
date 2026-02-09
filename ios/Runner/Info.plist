@@ -116,5 +116,9 @@
 	<string>Esta aplicación reproduce audio a través de dispositivos Bluetooth como auriculares y altavoces. No se accede a otros datos de Bluetooth.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Esta aplicación reproduce audio a través de dispositivos Bluetooth como auriculares y altavoces. El acceso a Bluetooth es necesario para mantener la conexión durante la reproducción de audio.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fénix es una app de lectura y reproducción de contenido de bienestar. Si se solicita este permiso, es solo para guardar contenido en tu dispositivo para uso personal. La app no realiza ventas ni transacciones.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Fénix es una app reader de contenido de bienestar. Este permiso permite guardar archivos en tu dispositivo para uso personal. No hay ventas ni compras dentro de la app.</string>
 </dict>
 </plist>
