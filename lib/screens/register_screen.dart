@@ -1,9 +1,32 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/auth_provider.dart';
+
+const String _termsContent = '''
+Términos y condiciones de uso de la aplicación Fénix.
+
+1. Aceptación
+Al registrarte y usar la aplicación aceptas estos términos. La app está destinada a contenido de bienestar y meditación.
+
+2. Uso de la aplicación
+El contenido (textos, audios, vídeos) es para uso personal. No está permitido redistribuir, revender o usar el contenido con fines comerciales sin autorización.
+
+3. Cuenta y datos
+Eres responsable de mantener la confidencialidad de tu cuenta. Los datos se tratan según nuestra política de privacidad.
+
+4. Propiedad intelectual
+Todo el contenido y la marca Fénix son propiedad de sus titulares. No se concede ninguna licencia más allá del uso personal en la app.
+
+5. Modificaciones
+Nos reservamos el derecho de modificar estos términos. El uso continuado de la app tras cambios implica su aceptación.
+
+6. Contacto
+Para dudas sobre estos términos puedes contactarnos a través de los canales indicados en la aplicación.
+''';
 
 /// Pantalla de registro. Copy neutro: sin referencias a ventas, precios ni membresías.
 class RegisterScreen extends StatefulWidget {
@@ -85,6 +108,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } else {
       setState(() => _errorMessage = authProvider.error ?? 'Error al crear la cuenta.');
     }
+  }
+
+  void _showTermsModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: AppColors.origen,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Términos y condiciones',
+                    style: AppTypography.ralewayRegular(
+                      fontSize: 18,
+                      color: AppColors.raizSagrada,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: const Icon(Icons.close, color: AppColors.raizSagrada),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  _termsContent,
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openPrivacyPolicy() async {
@@ -218,11 +292,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(top: 2),
-                        child: Text(
-                          'Acepto los términos para comenzar mi experiencia.',
-                          style: AppTypography.ralewayRegular(
-                            fontSize: 13,
-                            color: AppColors.raizSagrada,
+                        child: RichText(
+                          text: TextSpan(
+                            style: AppTypography.ralewayRegular(
+                              fontSize: 13,
+                              color: AppColors.raizSagrada,
+                            ),
+                            children: [
+                              const TextSpan(text: 'Acepto los '),
+                              TextSpan(
+                                text: 'términos y condiciones',
+                                style: AppTypography.ralewayRegular(
+                                  fontSize: 13,
+                                  color: AppColors.raizSagrada,
+                                ).copyWith(decoration: TextDecoration.underline),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = _showTermsModal,
+                              ),
+                              const TextSpan(text: ' para comenzar mi experiencia.'),
+                            ],
                           ),
                         ),
                       ),

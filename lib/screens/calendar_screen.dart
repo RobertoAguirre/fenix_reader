@@ -68,11 +68,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.origen,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 16),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
             Center(
               child: Text(
                 'Calendario',
@@ -201,12 +206,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
               child: _buildMessagesSearchBar(),
             ),
             const SizedBox(height: 8),
-            Expanded(
+            SizedBox(
+              height: 320,
               child: _buildMessagesList(),
             ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
+    ),
     );
   }
 
