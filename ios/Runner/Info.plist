@@ -120,5 +120,7 @@
 	<string>Fénix es una app de lectura y reproducción de contenido de bienestar. Si se solicita este permiso, es solo para guardar contenido en tu dispositivo para uso personal. La app no realiza ventas ni transacciones.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Fénix es una app reader de contenido de bienestar. Este permiso permite guardar archivos en tu dispositivo para uso personal. No hay ventas ni compras dentro de la app.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Fénix no utiliza tu ubicación. Esta descripción puede ser requerida por librerías de la app (p. ej. notificaciones).</string>
 </dict>
 </plist>
