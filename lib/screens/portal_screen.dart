@@ -63,6 +63,9 @@ class _PortalScreenState extends State<PortalScreen> {
   final TextEditingController _clasesSearchController = TextEditingController();
   bool _showClasesFavoritesOnly = false;
 
+  // Estado para PORTALES (diccionarios/documentos)
+  final TextEditingController _documentsSearchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -80,6 +83,7 @@ class _PortalScreenState extends State<PortalScreen> {
     _meditationsSearchController.dispose();
     _tappingsSearchController.dispose();
     _clasesSearchController.dispose();
+    _documentsSearchController.dispose();
     super.dispose();
   }
 
@@ -1537,11 +1541,58 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 24),
           
+          // Buscador (mismo patrón que Hipnosis/Meditaciones)
+          _buildDocumentsSearchBar(),
+          const SizedBox(height: 8),
+          
           // Lista de documentos
           _buildDocumentsList(),
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  /// Buscador para diccionarios/documentos (mismo estilo que Hipnosis)
+  Widget _buildDocumentsSearchBar() {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: AppColors.raizSagrada.withValues(alpha: 0.2),
+              ),
+            ),
+            child: TextField(
+              controller: _documentsSearchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar diccionarios...',
+                hintStyle: AppTypography.ralewayRegular(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: AppColors.raizSagrada.withValues(alpha: 0.5),
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              style: AppTypography.ralewayRegular(
+                fontSize: 14,
+                color: AppColors.raizSagrada,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -2254,15 +2305,23 @@ class _PortalScreenState extends State<PortalScreen> {
   /// Lista de documentos disponibles
   Widget _buildDocumentsList() {
     final documents = _getAvailableDocuments();
-    
-    if (documents.isEmpty) {
+    final searchQuery = _documentsSearchController.text.toLowerCase().trim();
+    final filtered = searchQuery.isEmpty
+        ? documents
+        : documents.where((doc) {
+            final titulo = (doc['titulo'] as String? ?? '').toLowerCase();
+            final descripcion = (doc['descripcion'] as String? ?? '').toLowerCase();
+            return titulo.contains(searchQuery) || descripcion.contains(searchQuery);
+          }).toList();
+
+    if (filtered.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ...documents.map((doc) => _buildDocumentCard(doc)),
+        ...filtered.map((doc) => _buildDocumentCard(doc)),
       ],
     );
   }
