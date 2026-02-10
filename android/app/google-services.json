@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "934901840788",
+    "project_id": "fenix-app-13245",
+    "storage_bucket": "fenix-app-13245.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:934901840788:android:1176403c207f6cb33a6d81",
+        "android_client_info": {
+          "package_name": "com.anonymous.fenix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfNv_NzSLzrOmdydgFbhYSIExJqv7wsu0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
