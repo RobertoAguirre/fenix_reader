@@ -5,6 +5,7 @@ import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../widgets/fenix_bottom_nav.dart';
 import '../providers/auth_provider.dart';
+import '../providers/calendar_refresh_provider.dart';
 import 'calendar_screen.dart';
 import 'portal_screen.dart';
 import 'profile_screen.dart';
@@ -43,7 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _screens[_currentIndex],
       bottomNavigationBar: FenixBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 1) context.read<CalendarRefreshNotifier>().refresh();
+        },
       ),
     );
   }

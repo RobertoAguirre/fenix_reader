@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/content_provider.dart';
+import '../services/activity_log_cache.dart';
 import '../services/wordpress_service.dart';
 import '../services/favorites_service.dart';
 import '../widgets/audio_player_modal.dart';
@@ -220,7 +222,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               description: item.description,
               image: item.image,
               isFavorite: isFavorite,
-              onTap: () {
+              onTap: () async {
                 if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -244,8 +246,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
                 // Normalizar URL (convertir Google Drive si es necesario)
                 final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
-                
-                // Abrir reproductor de audio
+
+                final email = context.read<AuthProvider>().user?.email;
+                if (email != null && email.isNotEmpty) {
+                  final ct = item.type == ContentType.hipnosis ? 'hipnosis' : (item.type == ContentType.meditacion ? 'meditacion' : 'otro');
+                  final now = DateTime.now();
+                  WordPressService().postActivityLog(
+                    email: email,
+                    contentId: item.id,
+                    contentType: ct,
+                    title: item.title,
+                    occurredAt: now,
+                  );
+                  await addActivityItem(email: email, occurredAt: now, contentType: ct, title: item.title);
+                }
+
                 showAudioPlayer(
                   context: context,
                   audioUrl: audioUrl,
@@ -425,7 +440,7 @@ class _LibraryListItem extends StatelessWidget {
                 ),
                 child: Icon(
                   isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: AppColors.white,
+                  color: isFavorite ? AppColors.ascenso : AppColors.white,
                   size: 18,
                 ),
               ),

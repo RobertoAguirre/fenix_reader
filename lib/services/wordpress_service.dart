@@ -411,9 +411,54 @@ class WordPressService {
   // ENDPOINTS DE PROGRAMAS (Tutor LMS)
   // ============================================
 
-  /// Obtener programas Tutor LMS
+  /// Lista de programas con access por usuario (endpoint con filtro email).
+  /// Cada item trae tutor_woo_product_id, unlocked, access (locked/unlocked).
+  Future<List<Map<String, dynamic>>> getProgramasTutorWithAccess(String email, {bool forceRefresh = false}) async {
+    try {
+      final response = await _retryWithBackoff(() async {
+        return await http.get(
+          Uri.parse('$baseUrl/programas-tutor?email=${Uri.encodeComponent(email)}'),
+          headers: _defaultHeaders,
+        ).timeout(slowTimeout);
+      });
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is List) {
+          return List<Map<String, dynamic>>.from(decoded);
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('❌ Error obteniendo programas (con access): $e');
+      return [];
+    }
+  }
+
+  /// Detalle y contenido de un programa; valida compra por email.
+  /// 403 = no compró → null. 200 = topics/lecciones (vimeo_url, embed_code, attachments).
+  Future<Map<String, dynamic>?> getProgramaVimeo(String programId, String email) async {
+    try {
+      final response = await _retryWithBackoff(() async {
+        return await http.get(
+          Uri.parse('$baseUrl/programa-vimeo?program_id=${Uri.encodeComponent(programId)}&email=${Uri.encodeComponent(email)}'),
+          headers: _defaultHeaders,
+        ).timeout(slowTimeout);
+      });
+
+      if (response.statusCode == 403) return null;
+      if (response.statusCode != 200) return null;
+
+      final decoded = jsonDecode(response.body);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (e) {
+      debugPrint('❌ Error programa-vimeo: $e');
+      return null;
+    }
+  }
+
+  /// Obtener programas Tutor LMS (sin email; legacy/cache)
   Future<List<Map<String, dynamic>>> getTutorCourses({bool forceRefresh = false}) async {
-    // Verificar caché si no se fuerza refresh
     if (!forceRefresh) {
       final cached = await _cacheService.getCachedCourses();
       if (cached != null) {
@@ -434,7 +479,6 @@ class WordPressService {
         final decoded = jsonDecode(response.body);
         if (decoded is List) {
           final result = List<Map<String, dynamic>>.from(decoded);
-          // Guardar en caché
           await _cacheService.saveCachedCourses(result);
           return result;
         }
@@ -442,7 +486,6 @@ class WordPressService {
       return [];
     } catch (e) {
       debugPrint('❌ Error obteniendo programas: $e');
-      // Intentar usar caché como fallback
       final cached = await _cacheService.getCachedCourses();
       if (cached != null) {
         return cached.map((item) => Map<String, dynamic>.from(item)).toList();
@@ -491,119 +534,13 @@ class WordPressService {
     }
   }
 
-  /// Obtener programas comprados del usuario
+  /// Lista de programas con access por usuario (endpoint nuevo con email).
+  /// Cada item trae access (locked/unlocked); no se usa enrollment ni membresía en app.
   Future<List<Map<String, dynamic>>> getUserPrograms(String email, {bool forceRefresh = false}) async {
     try {
-      debugPrint('📚 Obteniendo programas comprados del usuario: $email');
-      
-      // Obtener todos los programas disponibles
-      final allPrograms = await getTutorCourses(forceRefresh: forceRefresh);
-      
-      if (allPrograms.isEmpty) {
-        debugPrint('⚠️ No hay programas disponibles');
-        return [];
-      }
-      
-      debugPrint('📚 Programas disponibles: ${allPrograms.length}');
-      
-      // Verificar cuáles tiene comprados el usuario
-      final purchasedPrograms = <Map<String, dynamic>>[];
-      
-      for (final program in allPrograms) {
-        final courseId = program['ID'] as int? ?? program['id'] as int?;
-        if (courseId == null) continue;
-        
-        final isEnrolled = await checkUserEnrollment(email, courseId, forceRefresh: forceRefresh);
-        
-        if (isEnrolled) {
-          purchasedPrograms.add(program);
-          debugPrint('✅ Usuario tiene acceso a: ${program['post_title'] ?? program['title']}');
-          
-          // TEMPORAL: Obtener detalles del primer programa para extraer link de Vimeo
-          if (purchasedPrograms.length == 1) {
-            try {
-              final details = await getTutorCourseDetails(courseId);
-              if (details != null) {
-                debugPrint('🔍 Analizando detalles del programa para encontrar video de Vimeo...');
-                
-                // Buscar vimeo_embed_code en topics y lessons
-                final topics = details['topics'] as List<dynamic>? ?? [];
-                debugPrint('📋 Topics encontrados: ${topics.length}');
-                
-                for (final topic in topics) {
-                  final topicMap = topic as Map<String, dynamic>;
-                  final lessons = topicMap['lessons'];
-                  
-                  if (lessons != null) {
-                    List<dynamic> lessonsList = [];
-                    if (lessons is Map && lessons['data'] != null) {
-                      lessonsList = lessons['data'] as List<dynamic>? ?? [];
-                    } else if (lessons is List) {
-                      lessonsList = lessons;
-                    }
-                    
-                    debugPrint('📚 Lessons en topic "${topicMap['post_title']}": ${lessonsList.length}');
-                    
-                    for (final lesson in lessonsList) {
-                      final lessonMap = lesson as Map<String, dynamic>;
-                      final vimeoCode = lessonMap['vimeo_embed_code'] as String? ?? 
-                                       lessonMap['embed_code'] as String?;
-                      
-                      if (vimeoCode != null && vimeoCode.isNotEmpty) {
-                        debugPrint('');
-                        debugPrint('═══════════════════════════════════════════');
-                        debugPrint('🎥 LINK DE VIMEO ENCONTRADO:');
-                        debugPrint('═══════════════════════════════════════════');
-                        debugPrint('Título del programa: ${program['post_title'] ?? program['title']}');
-                        debugPrint('Topic: ${topicMap['post_title']}');
-                        debugPrint('Lesson: ${lessonMap['post_title']}');
-                        debugPrint('Vimeo Embed Code: $vimeoCode');
-                        debugPrint('═══════════════════════════════════════════');
-                        debugPrint('');
-                        
-                        // Extraer ID de Vimeo si es posible
-                        final vimeoIdMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(vimeoCode);
-                        final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(vimeoCode);
-                        final idMatch = vimeoIdMatch ?? playerMatch;
-                        
-                        if (idMatch != null) {
-                          final videoId = idMatch.group(1);
-                          debugPrint('🎬 ID de Vimeo extraído: $videoId');
-                          debugPrint('🔗 URL directa: https://vimeo.com/$videoId');
-                          debugPrint('🔗 URL player: https://player.vimeo.com/video/$videoId');
-                        }
-                        debugPrint('');
-                        break; // Solo mostrar el primero encontrado
-                      }
-                    }
-                  }
-                }
-              }
-            } catch (e) {
-              debugPrint('⚠️ Error obteniendo detalles para debug: $e');
-            }
-          }
-        }
-      }
-      
-      // Si el usuario tiene membresía activa, darle acceso a todos los programas
-      if (purchasedPrograms.length < allPrograms.length) {
-        final hasMembership = await _cacheService.getMembershipAllowed(email);
-        if (hasMembership) {
-          debugPrint('🔑 Membresía activa: dando acceso a todos los programas');
-          final purchasedIds = purchasedPrograms.map((p) => p['ID'] ?? p['id']).toSet();
-          for (final program in allPrograms) {
-            final courseId = program['ID'] ?? program['id'];
-            if (!purchasedIds.contains(courseId)) {
-              purchasedPrograms.add(program);
-              debugPrint('🔑 Acceso por membresía: ${program['post_title'] ?? program['title']}');
-            }
-          }
-        }
-      }
-
-      debugPrint('✅ Programas del usuario: ${purchasedPrograms.length}');
-      return purchasedPrograms;
+      final list = await getProgramasTutorWithAccess(email, forceRefresh: forceRefresh);
+      debugPrint('📚 Programas (con access): ${list.length}');
+      return list;
     } catch (e) {
       debugPrint('❌ Error obteniendo programas del usuario: $e');
       return [];
@@ -860,36 +797,110 @@ class WordPressService {
     return sessions;
   }
 
-  /// Token para endpoint push-log (calendario de mensajes diarios)
-  static const String _pushLogToken = 'MI_TOKEN_SECRETO_PUSHLOG';
+  // ============================================
+  // ACTIVITY LOG (seguimiento consumo en calendario)
+  // ============================================
 
-  /// Obtener registro de pushes (mensajes diarios) para un rango de fechas
+  /// Registrar que el usuario consumió contenido (meditación, hipnosis, etc.)
+  Future<bool> postActivityLog({
+    required String email,
+    required int contentId,
+    required String contentType,
+    required String title,
+    required DateTime occurredAt,
+  }) async {
+    try {
+      final occurredStr = '${occurredAt.year}-${occurredAt.month.toString().padLeft(2, '0')}-${occurredAt.day.toString().padLeft(2, '0')} '
+          '${occurredAt.hour.toString().padLeft(2, '0')}:${occurredAt.minute.toString().padLeft(2, '0')}:${occurredAt.second.toString().padLeft(2, '0')}';
+      final body = jsonEncode({
+        'email': email,
+        'content_id': contentId,
+        'content_type': contentType,
+        'title': title,
+        'occurred_at': occurredStr,
+      });
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/activity-log'),
+            headers: {..._defaultHeaders, 'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(normalTimeout);
+      if (response.statusCode != 200) {
+        debugPrint('❌ postActivityLog status: ${response.statusCode} body: ${response.body}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('❌ postActivityLog: $e');
+      return false;
+    }
+  }
+
+  /// Obtener calendario de actividad por usuario (días con consumo de contenido).
+  /// Respuesta: { "days": { "2026-02-11": { "count": 2, "types": { "meditacion": 1, "hipnosis": 1 } } } }
+  Future<Map<String, Map<String, dynamic>>> getActivityCalendar(
+    String email, {
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    try {
+      var uri = Uri.parse('$baseUrl/activity-calendar?email=${Uri.encodeComponent(email)}');
+      if (from != null && to != null) {
+        final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+        final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+        uri = Uri.parse('$baseUrl/activity-calendar?email=${Uri.encodeComponent(email)}&from=$fromStr&to=$toStr');
+      }
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return {};
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return {};
+      final days = body['days'];
+      if (days is! Map<String, dynamic>) return {};
+      return days.map((k, v) => MapEntry(k, Map<String, dynamic>.from(v as Map)));
+    } catch (e) {
+      debugPrint('❌ getActivityCalendar: $e');
+      return {};
+    }
+  }
+
+  /// Obtener mensajes diarios (push-log). GET fenix/v1/push-log?from=YYYY-MM-DD&to=YYYY-MM-DD
+  /// Backend devuelve: title, message, sent_day, sent_at, segment (array o objeto con lista dentro).
   Future<List<DailyMessage>> getPushLog(DateTime from, DateTime to) async {
     final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
     final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
     final uri = Uri.parse('$baseUrl/push-log?from=$fromStr&to=$toStr');
-    final headers = {
-      ..._defaultHeaders,
-      'x-fenix-token': _pushLogToken,
-    };
     try {
-      final response = await http.get(uri, headers: headers).timeout(normalTimeout);
-      if (response.statusCode != 200) return [];
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) {
+        debugPrint('❌ getPushLog status: ${response.statusCode}');
+        return [];
+      }
       final body = jsonDecode(response.body);
-      if (body is! List) return [];
+      List<dynamic> rawList = [];
+      if (body is List) {
+        rawList = body;
+      } else if (body is Map<String, dynamic>) {
+        for (final key in ['data', 'messages', 'items', 'posts']) {
+          final v = body[key];
+          if (v is List) {
+            rawList = v;
+            break;
+          }
+        }
+      }
       final list = <DailyMessage>[];
-      for (final e in body) {
+      for (final e in rawList) {
         if (e is! Map<String, dynamic>) continue;
-        final sentAt = e['sent_at'] as String?;
-        if (sentAt == null || sentAt.isEmpty) continue;
-        final date = _parseSentAt(sentAt);
+        final date = _parseDate(e['sent_day'] as String?) ?? _parseSentAt(e['sent_at'] as String?);
         if (date == null) continue;
         list.add(DailyMessage(
           date: date,
-          title: e['title'] as String? ?? '',
-          message: e['message'] as String? ?? '',
+          title: (e['title'] as String?)?.trim() ?? '',
+          message: (e['message'] as String?)?.trim() ?? '',
         ));
       }
+      debugPrint('✅ getPushLog: ${list.length} mensajes');
       return list;
     } catch (e) {
       debugPrint('❌ getPushLog: $e');
@@ -897,17 +908,24 @@ class WordPressService {
     }
   }
 
-  static DateTime? _parseSentAt(String sentAt) {
+  static DateTime? _parseDate(String? s) {
+    if (s == null || s.isEmpty) return null;
+    final str = s.length >= 10 ? s.substring(0, 10) : s;
+    final parts = str.split('-');
+    if (parts.length != 3) return null;
+    final y = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final d = int.tryParse(parts[2]) ?? 0;
+    if (y == 0 || m == 0 || d == 0) return null;
+    return DateTime(y, m, d);
+  }
+
+  static DateTime? _parseSentAt(String? sentAt) {
+    if (sentAt == null || sentAt.isEmpty) return null;
     try {
       final parts = sentAt.split(' ');
       if (parts.isEmpty) return null;
-      final dateParts = parts[0].split('-');
-      if (dateParts.length != 3) return null;
-      final y = int.tryParse(dateParts[0]) ?? 0;
-      final m = int.tryParse(dateParts[1]) ?? 0;
-      final d = int.tryParse(dateParts[2]) ?? 0;
-      if (y == 0 || m == 0 || d == 0) return null;
-      return DateTime(y, m, d);
+      return _parseDate(parts[0]);
     } catch (_) {
       return null;
     }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/calendar_refresh_provider.dart';
 import 'providers/content_provider.dart';
 import 'providers/membership_provider.dart';
 import 'providers/program_provider.dart';
@@ -50,6 +51,7 @@ class FenixReaderApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ContentProvider()),
         ChangeNotifierProvider(create: (_) => MembershipProvider()),
         ChangeNotifierProvider(create: (_) => ProgramProvider()),
+        ChangeNotifierProvider(create: (_) => CalendarRefreshNotifier()),
       ],
       child: MaterialApp(
         title: 'Fénix',

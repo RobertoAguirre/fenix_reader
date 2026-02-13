@@ -22,6 +22,7 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
 import 'package:flutter_screenshot_blocker/flutter_screenshot_blocker.dart';
+import '../services/activity_log_cache.dart';
 import '../services/favorites_service.dart';
 
 /// Pantalla de Portales/Inicio con tabs
@@ -361,6 +362,7 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   Widget _buildProgramsList(List<Map<String, dynamic>> programs) {
+    final disponibles = programs.where((p) => _isProgramUnlocked(p)).toList();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -396,8 +398,8 @@ class _PortalScreenState extends State<PortalScreen> {
 
           const SizedBox(height: 20),
 
-          // Grid de programas
-          if (programs.isEmpty)
+          // Grid: solo contenido disponible
+          if (disponibles.isEmpty)
             _buildEmptyState()
           else
             GridView.builder(
@@ -409,10 +411,9 @@ class _PortalScreenState extends State<PortalScreen> {
                 mainAxisSpacing: 12,
                 childAspectRatio: 0.75,
               ),
-              itemCount: programs.length,
+              itemCount: disponibles.length,
               itemBuilder: (context, index) {
-                final program = programs[index];
-                return _buildProgramGridCard(program);
+                return _buildProgramGridCard(disponibles[index]);
               },
             ),
           const SizedBox(height: 20),
@@ -421,10 +422,27 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
+  static bool _isProgramUnlocked(Map<String, dynamic> program) {
+    final access = program['access'];
+    if (access == 'unlocked') return true;
+    if (program['unlocked'] == true) return true;
+    if (access == 'locked') return false;
+    return false;
+  }
+
+  static String? _getProgramId(Map<String, dynamic> program) {
+    final id = program['program_id'] as String? ?? program['post_name'] as String?;
+    if (id != null && id.isNotEmpty) return id;
+    final title = ((program['post_title'] ?? program['title']) ?? '').toString().toLowerCase();
+    if (title.contains('riqueza') || title.contains('multidimensional')) return 'riqueza_multidimensional';
+    if (title.contains('amor') || title.contains('propio') || title.contains('21')) return 'amor_propio';
+    return null;
+  }
+
   Widget _buildProgramGridCard(Map<String, dynamic> program) {
     final title = program['post_title'] as String? ?? program['title'] as String? ?? 'Sin título';
     final image = program['featuredImage'] as String? ?? program['image'] as String?;
-    
+
     return GestureDetector(
       onTap: () => _showProgramModal(program),
       child: Container(
@@ -442,7 +460,6 @@ class _PortalScreenState extends State<PortalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: AspectRatio(
@@ -473,7 +490,6 @@ class _PortalScreenState extends State<PortalScreen> {
                     : _buildGradientFallbackForProgram(program),
               ),
             ),
-            // Contenido
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -1141,8 +1157,9 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   void _showProgramModal(Map<String, dynamic> program) async {
-    final courseId = program['ID'] as int? ?? program['id'] as int?;
-    if (courseId == null) {
+    final programId = _getProgramId(program);
+    final email = context.read<AuthProvider>().user?.email;
+    if (programId == null || email == null || email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No se pudo cargar el programa'),
@@ -1152,7 +1169,6 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
-    // Mostrar loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1163,35 +1179,15 @@ class _PortalScreenState extends State<PortalScreen> {
 
     try {
       final wpService = WordPressService();
-      final title = ((program['post_title'] ?? program['title']) ?? '').toString().toLowerCase();
-      String? programId;
-      if (title.contains('riqueza') || title.contains('multidimensional')) {
-        programId = 'riqueza_multidimensional';
-      } else if (title.contains('amor') || title.contains('propio') || title.contains('21')) {
-        programId = 'amor_propio';
-      }
-
-      Map<String, dynamic>? details;
-      if (programId != null) {
-        details = await wpService.getProgramContentFromStaticJson(programId);
-        final topics = details?['topics'];
-        if (topics != null && topics is List && topics.isNotEmpty) {
-          details = {'topics': topics};
-        } else {
-          details = null;
-        }
-      }
-      if (details == null) {
-        details = await wpService.getTutorCourseDetails(courseId);
-      }
+      final details = await wpService.getProgramaVimeo(programId, email);
 
       if (!context.mounted) return;
-      Navigator.pop(context); // Cerrar loading
+      Navigator.pop(context);
 
       if (details == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No se pudieron cargar los detalles del programa'),
+            content: Text('Este contenido no está disponible'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1203,7 +1199,7 @@ class _PortalScreenState extends State<PortalScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        Navigator.pop(context); // Cerrar loading si aún está abierto
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al cargar el programa: $e'),
@@ -1349,8 +1345,8 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   Widget _buildProgramLesson(Map<String, dynamic> lesson, BuildContext modalContext) {
-    final lessonTitle = lesson['post_title'] as String? ?? 'Sin título';
-    final vimeoCode = lesson['vimeo_embed_code'] as String? ?? lesson['embed_code'] as String?;
+    final lessonTitle = lesson['post_title'] as String? ?? lesson['title'] as String? ?? 'Sin título';
+    final vimeoCode = lesson['vimeo_embed_code'] as String? ?? lesson['embed_code'] as String? ?? lesson['vimeo_url'] as String?;
     final postContent = lesson['post_content'] as String? ?? '';
     final isPdf = postContent.endsWith('.pdf');
     final hasVideo = vimeoCode != null && vimeoCode.isNotEmpty;
@@ -1381,6 +1377,7 @@ class _PortalScreenState extends State<PortalScreen> {
             final vimeoService = VimeoService();
             final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
             if (directUrl != null && directUrl.isNotEmpty && mounted) {
+              _logActivity('programa', 0, lessonTitle);
               showVideoPlayer(context: context, videoUrl: directUrl, title: lessonTitle);
             } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1394,10 +1391,25 @@ class _PortalScreenState extends State<PortalScreen> {
           return;
         }
         if (isAudio && mounted) {
+          _logActivity('programa', 0, lessonTitle);
           showAudioPlayer(context: context, audioUrl: postContent, title: lessonTitle);
         }
       },
     );
+  }
+
+  Future<void> _logActivity(String contentType, int contentId, String title) async {
+    final email = context.read<AuthProvider>().user?.email;
+    if (email == null || email.isEmpty) return;
+    final now = DateTime.now();
+    WordPressService().postActivityLog(
+      email: email,
+      contentId: contentId,
+      contentType: contentType,
+      title: title,
+      occurredAt: now,
+    );
+    await addActivityItem(email: email, occurredAt: now, contentType: contentType, title: title);
   }
 
   /// Construir contenido de CONSULTA EXPRÉS
@@ -1494,8 +1506,12 @@ class _PortalScreenState extends State<PortalScreen> {
 
     // Normalizar URL (convertir Google Drive si es necesario)
     final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
-    
-    // Abrir reproductor de audio
+
+    _logActivity(
+      item.type == ContentType.hipnosis ? 'hipnosis' : (item.type == ContentType.meditacion ? 'meditacion' : 'otro'),
+      item.id,
+      item.title,
+    );
     showAudioPlayer(
       context: context,
       audioUrl: audioUrl,
@@ -1736,9 +1752,10 @@ class _PortalScreenState extends State<PortalScreen> {
               ),
             ),
             child: Center(
-              child: Text(
-                '🤍',
-                style: const TextStyle(fontSize: 24),
+              child: Icon(
+                _showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                size: 24,
+                color: _showFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -1968,14 +1985,10 @@ class _PortalScreenState extends State<PortalScreen> {
                             color: AppColors.white.withValues(alpha: 0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            isFavorite ? '🤍' : '🤍',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: isFavorite 
-                                  ? AppColors.expansionAlquimica
-                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
-                            ),
+                          child: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            size: 20,
+                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -2147,9 +2160,10 @@ class _PortalScreenState extends State<PortalScreen> {
               ),
             ),
             child: Center(
-              child: Text(
-                '🤍',
-                style: const TextStyle(fontSize: 24),
+              child: Icon(
+                _showMeditationsFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                size: 24,
+                color: _showMeditationsFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -2266,14 +2280,10 @@ class _PortalScreenState extends State<PortalScreen> {
                             color: AppColors.white.withValues(alpha: 0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            isFavorite ? '🤍' : '🤍',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: isFavorite 
-                                  ? AppColors.expansionAlquimica
-                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
-                            ),
+                          child: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            size: 20,
+                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -2725,9 +2735,10 @@ class _PortalScreenState extends State<PortalScreen> {
               ),
             ),
             child: Center(
-              child: Text(
-                '🤍',
-                style: const TextStyle(fontSize: 24),
+              child: Icon(
+                _showTappingsFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                size: 24,
+                color: _showTappingsFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -2856,14 +2867,10 @@ class _PortalScreenState extends State<PortalScreen> {
                             color: AppColors.white.withValues(alpha: 0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            isFavorite ? '🤍' : '🤍',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: isFavorite 
-                                  ? AppColors.expansionAlquimica
-                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
-                            ),
+                          child: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            size: 20,
+                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -2969,6 +2976,7 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
+    _logActivity('tapping', tapping.id, tapping.title);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -3192,9 +3200,10 @@ class _PortalScreenState extends State<PortalScreen> {
               ),
             ),
             child: Center(
-              child: Text(
-                '🤍',
-                style: const TextStyle(fontSize: 24),
+              child: Icon(
+                _showClasesFavoritesOnly ? Icons.favorite : Icons.favorite_border,
+                size: 24,
+                color: _showClasesFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -3323,14 +3332,10 @@ class _PortalScreenState extends State<PortalScreen> {
                             color: AppColors.white.withValues(alpha: 0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: Text(
-                            isFavorite ? '🤍' : '🤍',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: isFavorite 
-                                  ? AppColors.expansionAlquimica
-                                  : AppColors.raizSagrada.withValues(alpha: 0.3),
-                            ),
+                          child: Icon(
+                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                            size: 20,
+                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -3390,6 +3395,7 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
+    _logActivity('clase', clase.id, clase.title);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

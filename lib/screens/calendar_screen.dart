@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../models/daily_message.dart';
+import '../providers/auth_provider.dart';
+import '../providers/calendar_refresh_provider.dart';
+import '../services/activity_log_cache.dart';
 import '../services/wordpress_service.dart';
 
 /// Pantalla de calendario: mensajes diarios (push) por fecha.
@@ -16,7 +20,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   static const List<String> _weekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
   final WordPressService _wpService = WordPressService();
   Map<DateTime, List<DailyMessage>> _messagesByDate = {};
+  Map<String, Map<String, dynamic>> _activityDays = {};
   bool _loading = false;
+  int _lastRefreshTrigger = 0;
   final TextEditingController _messagesSearchController = TextEditingController();
 
   @override
@@ -43,9 +49,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
     for (final m in list) {
       (map[m.date] ??= []).add(m);
     }
+    Map<String, Map<String, dynamic>> activity = {};
+    final email = mounted ? context.read<AuthProvider>().user?.email : null;
+    if (email != null && email.isNotEmpty) {
+      activity = await _wpService.getActivityCalendar(email, from: from, to: to);
+    }
     if (!mounted) return;
     setState(() {
       _messagesByDate = map;
+      _activityDays = activity;
       _loading = false;
     });
   }
@@ -61,6 +73,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final refreshTrigger = context.watch<CalendarRefreshNotifier>().trigger;
+    if (refreshTrigger != _lastRefreshTrigger) {
+      _lastRefreshTrigger = refreshTrigger;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadMessagesForMonth());
+    }
     final daysInMonth = _daysInMonth(_focusedMonth);
     final firstWeekday = _firstWeekday(_focusedMonth);
     final today = DateTime.now();
@@ -177,7 +194,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     }
                     final day = dayIndex;
                     final dateKey = DateTime(_focusedMonth.year, _focusedMonth.month, day);
+                    final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
                     final messages = _messagesByDate[dateKey] ?? [];
+                    final activityData = _activityDays[dateStr];
+                    final hasActivity = activityData != null;
                     final isToday = _focusedMonth.year == today.year &&
                         _focusedMonth.month == today.month &&
                         day == today.day;
@@ -185,8 +205,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       day: day,
                       isToday: isToday,
                       hasMessage: messages.isNotEmpty,
+                      hasActivity: hasActivity,
                       messages: messages,
-                      onTap: () => _showMessagesForDay(context, dateKey, messages),
+                      onTap: () {
+                        if (hasActivity) {
+                          _showActivityForDay(context, dateKey, activityData!, messages);
+                        } else if (messages.isNotEmpty) {
+                          _showMessagesForDay(context, dateKey, messages);
+                        }
+                      },
                     );
                   },
                 ),
@@ -317,6 +344,119 @@ class _CalendarScreenState extends State<CalendarScreen> {
       'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
     ];
     return names[month - 1];
+  }
+
+  void _showActivityForDay(
+    BuildContext context,
+    DateTime dateKey,
+    Map<String, dynamic> activityData,
+    List<DailyMessage> messages,
+  ) async {
+    final typeLabels = <String, String>{
+      'meditacion': 'Meditación',
+      'hipnosis': 'Hipnosis',
+      'tapping': 'Tapping',
+      'clase': 'Clase',
+      'programa': 'Programa',
+    };
+    final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
+    final email = context.read<AuthProvider>().user?.email;
+    final cacheItems = (email != null && email.isNotEmpty) ? await getActivityItems(email, dateStr) : <Map<String, String>>[];
+    final fechaTexto = '${dateKey.day} ${_monthName(dateKey.month)} ${dateKey.year}';
+    if (!context.mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.origen,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'El día $fechaTexto utilizaste este contenido:',
+                style: AppTypography.ralewayBold(
+                  fontSize: 16,
+                  color: AppColors.raizSagrada,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (cacheItems.isNotEmpty)
+                ...cacheItems.map((item) {
+                  final label = typeLabels[item['type']!] ?? item['type']!;
+                  final title = item['title'] ?? '';
+                  final at = item['at'] ?? '';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '$label: $title${at.isNotEmpty ? ', $at' : ''}',
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 14,
+                        color: AppColors.raizSagrada,
+                      ),
+                    ),
+                  );
+                })
+              else
+                ...(activityData['types'] as Map<String, dynamic>? ?? {}).entries.map((e) {
+                  final label = typeLabels[e.key] ?? e.key;
+                  final n = e.value is int ? e.value as int : 1;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      '$label: ${n == 1 ? "1 contenido" : "$n contenidos"}',
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 14,
+                        color: AppColors.raizSagrada,
+                      ),
+                    ),
+                  );
+                }),
+              if (messages.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Mensajes',
+                  style: AppTypography.ralewayBold(
+                    fontSize: 16,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...messages.map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (m.title.isNotEmpty)
+                        Text(
+                          m.title,
+                          style: AppTypography.ralewayBold(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada,
+                          ),
+                        ),
+                      if (m.title.isNotEmpty && m.message.isNotEmpty) const SizedBox(height: 4),
+                      if (m.message.isNotEmpty)
+                        Text(
+                          m.message,
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 13,
+                            color: AppColors.raizSagrada,
+                          ),
+                        ),
+                    ],
+                  ),
+                )),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showMessagesForDay(BuildContext context, DateTime dateKey, List<DailyMessage> messages) {
@@ -451,6 +591,7 @@ class _DayCell extends StatelessWidget {
   final int day;
   final bool isToday;
   final bool hasMessage;
+  final bool hasActivity;
   final List<DailyMessage> messages;
   final VoidCallback onTap;
 
@@ -458,27 +599,33 @@ class _DayCell extends StatelessWidget {
     required this.day,
     required this.isToday,
     required this.hasMessage,
+    required this.hasActivity,
     required this.messages,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final showDot = hasMessage || hasActivity;
+    final isConsumedDay = hasActivity;
+    final borderColor = isToday
+        ? AppColors.ascenso
+        : isConsumedDay
+            ? AppColors.ascenso
+            : showDot
+                ? AppColors.expansionAlquimica.withValues(alpha: 0.5)
+                : AppColors.raizSagrada.withValues(alpha: 0.15);
+    final backgroundColor = isToday || isConsumedDay
+        ? AppColors.ascenso.withValues(alpha: 0.3)
+        : AppColors.white;
+    final textColor = (isToday || isConsumedDay) ? AppColors.ascenso : AppColors.raizSagrada;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isToday
-              ? AppColors.ascenso.withValues(alpha: 0.3)
-              : AppColors.white,
+          color: backgroundColor,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isToday
-                ? AppColors.ascenso
-                : hasMessage
-                    ? AppColors.expansionAlquimica.withValues(alpha: 0.5)
-                    : AppColors.raizSagrada.withValues(alpha: 0.15),
-          ),
+          border: Border.all(color: borderColor),
         ),
         child: Stack(
           alignment: Alignment.center,
@@ -487,10 +634,10 @@ class _DayCell extends StatelessWidget {
               '$day',
               style: AppTypography.ralewayRegular(
                 fontSize: 14,
-                color: AppColors.raizSagrada,
+                color: textColor,
               ),
             ),
-            if (hasMessage)
+            if (showDot)
               Positioned(
                 top: 4,
                 right: 4,
@@ -498,7 +645,7 @@ class _DayCell extends StatelessWidget {
                   width: 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: AppColors.expansionAlquimica,
+                    color: hasActivity ? AppColors.ascenso : AppColors.expansionAlquimica,
                     shape: BoxShape.circle,
                   ),
                 ),
