@@ -6,6 +6,8 @@ import '../providers/auth_provider.dart';
 import '../providers/calendar_refresh_provider.dart';
 import '../services/activity_log_cache.dart';
 import '../services/wordpress_service.dart';
+import '../services/moon_phase_service.dart';
+import '../widgets/moon_phase_icon.dart';
 
 /// Pantalla de calendario: mensajes diarios (push) por fecha.
 class CalendarScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final WordPressService _wpService = WordPressService();
   Map<DateTime, List<DailyMessage>> _messagesByDate = {};
   Map<String, Map<String, dynamic>> _activityDays = {};
+  Map<String, Map<String, dynamic>> _thetaSessionsByDate = {};
   bool _loading = false;
   int _lastRefreshTrigger = 0;
   final TextEditingController _messagesSearchController = TextEditingController();
@@ -54,10 +57,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (email != null && email.isNotEmpty) {
       activity = await _wpService.getActivityCalendar(email, from: from, to: to);
     }
+    final thetaSessions = await _wpService.getThetaFenixSessions(from: from, to: to);
     if (!mounted) return;
     setState(() {
       _messagesByDate = map;
       _activityDays = activity;
+      _thetaSessionsByDate = thetaSessions;
       _loading = false;
     });
   }
@@ -66,9 +71,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return DateTime(month.year, month.month + 1, 0).day;
   }
 
+  /// Columna 0 = Lunes, 6 = Domingo. Número de celdas vacías antes del día 1.
   int _firstWeekday(DateTime month) {
-    final w = DateTime(month.year, month.month, 1).weekday;
-    return w - 1;
+    final w = DateTime(month.year, month.month, 1).weekday; // 1=Lun, 7=Dom
+    return w - 1; // 0=Lun, 6=Dom
   }
 
   @override
@@ -98,13 +104,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 16),
-            Center(
-              child: Text(
-                'Calendario',
-                style: AppTypography.kaushanTitle(
-                  fontSize: 28,
-                  color: AppColors.raizSagrada,
-                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Calendario',
+                        style: AppTypography.kaushanTitle(
+                          fontSize: 28,
+                          color: AppColors.raizSagrada,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const MoonPhaseIcon(),
+                ],
               ),
             ),
             const SizedBox(height: 24),
@@ -188,7 +205,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                   itemCount: 42,
                   itemBuilder: (context, index) {
-                    final dayIndex = index - firstWeekday;
+                    final dayIndex = index - firstWeekday + 1;
                     if (dayIndex < 1 || dayIndex > daysInMonth) {
                       return const SizedBox.shrink();
                     }
@@ -197,21 +214,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
                     final messages = _messagesByDate[dateKey] ?? [];
                     final activityData = _activityDays[dateStr];
+                    final thetaSession = _thetaSessionsByDate[dateStr];
                     final hasActivity = activityData != null;
+                    final hasThetaSession = thetaSession != null;
                     final isToday = _focusedMonth.year == today.year &&
                         _focusedMonth.month == today.month &&
                         day == today.day;
+                    final moonPhase = MoonPhaseService.getPhase(dateKey);
                     return _DayCell(
                       day: day,
                       isToday: isToday,
                       hasMessage: messages.isNotEmpty,
                       hasActivity: hasActivity,
+                      hasThetaSession: hasThetaSession,
+                      moonPhaseIndex: moonPhase.index,
                       messages: messages,
                       onTap: () {
                         if (hasActivity) {
-                          _showActivityForDay(context, dateKey, activityData!, messages);
-                        } else if (messages.isNotEmpty) {
-                          _showMessagesForDay(context, dateKey, messages);
+                          _showActivityForDay(context, dateKey, activityData!, messages, thetaSession);
+                        } else {
+                          _showMessagesForDay(context, dateKey, messages, thetaSession);
                         }
                       },
                     );
@@ -328,11 +350,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
         final entry = filtered[index];
         final dateKey = entry.date;
         final messages = _messagesByDate[dateKey] ?? [];
+        final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
         return _MessageListTile(
           date: dateKey,
           message: entry.message,
           monthName: _monthName(dateKey.month),
-          onTap: () => _showMessagesForDay(context, dateKey, messages),
+          onTap: () => _showMessagesForDay(context, dateKey, messages, _thetaSessionsByDate[dateStr]),
         );
       },
     );
@@ -351,6 +374,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     DateTime dateKey,
     Map<String, dynamic> activityData,
     List<DailyMessage> messages,
+    Map<String, dynamic>? thetaSession,
   ) async {
     final typeLabels = <String, String>{
       'meditacion': 'Meditación',
@@ -452,6 +476,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 )),
               ],
+              if (thetaSession != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Sesión Theta Fénix',
+                  style: AppTypography.ralewayBold(
+                    fontSize: 16,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatThetaSession(thetaSession),
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -459,8 +501,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  void _showMessagesForDay(BuildContext context, DateTime dateKey, List<DailyMessage> messages) {
-    if (messages.isEmpty) return;
+  String _formatThetaSession(Map<String, dynamic> s) {
+    final title = s['title']?.toString() ?? 'Sesión Theta Fénix';
+    final time = s['time']?.toString() ?? '';
+    final duration = s['duration']?.toString() ?? '';
+    final parts = <String>[title];
+    if (time.isNotEmpty) parts.add(time);
+    if (duration.isNotEmpty) parts.add(duration);
+    return parts.join(' · ');
+  }
+
+  void _showMessagesForDay(BuildContext context, DateTime dateKey, List<DailyMessage> messages, Map<String, dynamic>? thetaSession) {
+    if (messages.isEmpty && thetaSession == null) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.origen,
@@ -507,6 +559,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ],
                 ),
               )),
+              if (thetaSession != null) ...[
+                if (messages.isNotEmpty) const SizedBox(height: 16),
+                Text(
+                  'Sesión Theta Fénix',
+                  style: AppTypography.ralewayBold(
+                    fontSize: 16,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _formatThetaSession(thetaSession),
+                  style: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.raizSagrada,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -587,11 +657,16 @@ class _MessageListTile extends StatelessWidget {
   }
 }
 
+/// Emojis por fase: nueva, creciente, cuarto crec., gibosa crec., llena, gibosa meng., cuarto meng., menguante.
+const List<String> _moonPhaseEmojis = ['🌑', '🌒', '🌓', '🌔', '🌕', '🌖', '🌗', '🌘'];
+
 class _DayCell extends StatelessWidget {
   final int day;
   final bool isToday;
   final bool hasMessage;
   final bool hasActivity;
+  final bool hasThetaSession;
+  final int moonPhaseIndex;
   final List<DailyMessage> messages;
   final VoidCallback onTap;
 
@@ -600,13 +675,15 @@ class _DayCell extends StatelessWidget {
     required this.isToday,
     required this.hasMessage,
     required this.hasActivity,
+    required this.hasThetaSession,
+    required this.moonPhaseIndex,
     required this.messages,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final showDot = hasMessage || hasActivity;
+    final showDot = hasMessage || hasActivity || hasThetaSession;
     final isConsumedDay = hasActivity;
     final borderColor = isToday
         ? AppColors.ascenso
@@ -619,6 +696,12 @@ class _DayCell extends StatelessWidget {
         ? AppColors.ascenso.withValues(alpha: 0.3)
         : AppColors.white;
     final textColor = (isToday || isConsumedDay) ? AppColors.ascenso : AppColors.raizSagrada;
+    final dotColor = hasThetaSession
+        ? AppColors.raizSagrada
+        : hasActivity
+            ? AppColors.ascenso
+            : AppColors.expansionAlquimica;
+    final phaseEmoji = _moonPhaseEmojis[moonPhaseIndex.clamp(0, 7)];
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -645,11 +728,22 @@ class _DayCell extends StatelessWidget {
                   width: 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: hasActivity ? AppColors.ascenso : AppColors.expansionAlquimica,
+                    color: dotColor,
                     shape: BoxShape.circle,
                   ),
                 ),
               ),
+            Positioned(
+              bottom: 2,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  phaseEmoji,
+                  style: const TextStyle(fontSize: 10),
+                ),
+              ),
+            ),
           ],
         ),
       ),

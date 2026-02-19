@@ -681,120 +681,93 @@ class WordPressService {
     }
   }
 
-  /// Obtener sesiones de THETAFENIX
-  Future<Map<String, dynamic>> getThetaFenixSessions() async {
+  /// Sesiones Theta Fénix desde fenix/v1/amelia-events (from/to, opcional limit).
+  /// Devuelve mapa dateKey (YYYY-MM-DD) -> { date, title, start_at, end_at, time, duration }.
+  Future<Map<String, Map<String, dynamic>>> getThetaFenixSessions({DateTime? from, DateTime? to}) async {
     try {
-      final response = await _retryWithBackoff(() async {
-        return await http.get(
-          Uri.parse('$wpBaseUrl/pages?search=thetahealing'),
-          headers: _defaultHeaders,
-        ).timeout(slowTimeout);
-      });
-
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        final pages = decoded is List ? List<Map<String, dynamic>>.from(decoded) : [];
-        
-        // Buscar la página de ThetaFénix Grupal
-        final thetaFenixPage = pages.firstWhere(
-          (page) {
-            final title = page['title']?['rendered'] as String? ?? '';
-            final slug = page['slug'] as String? ?? '';
-            return title.toLowerCase().contains('thetafénix grupal') ||
-                   title.toLowerCase().contains('thetafenix grupal') ||
-                   slug.toLowerCase().contains('thetahealing');
-          },
-          orElse: () => <String, dynamic>{},
-        );
-
-        if (thetaFenixPage.isEmpty) {
-          debugPrint('⚠️ Página de ThetaFénix no encontrada');
-          return {
-            'pageInfo': null,
-            'sessions': <Map<String, dynamic>>[],
-          };
-        }
-
-        // Parsear sesiones del HTML
-        final content = thetaFenixPage['content']?['rendered'] as String? ?? '';
-        final sessions = _parseSessionsFromHTML(content);
-
-        return {
-          'pageInfo': {
-            'title': thetaFenixPage['title']?['rendered'] as String? ?? '',
-            'description': thetaFenixPage['excerpt']?['rendered'] as String? ?? '',
-          },
-          'sessions': sessions,
+      var uri = Uri.parse('$baseUrl/amelia-events');
+      if (from != null && to != null) {
+        final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+        final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+        uri = Uri.parse('$baseUrl/amelia-events?from=$fromStr&to=$toStr');
+      }
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return {};
+      final body = jsonDecode(response.body);
+      List<dynamic> list = <dynamic>[];
+      if (body is List) {
+        list = body;
+      } else if (body is Map) {
+        final m = body as Map;
+        if (m['items'] is List) list = m['items'] as List;
+        else if (m['events'] is List) list = m['events'] as List;
+        else if (m['data'] is List) list = m['data'] as List;
+      }
+      final out = <String, Map<String, dynamic>>{};
+      for (final e in list) {
+        if (e is! Map<String, dynamic>) continue;
+        final startAt = (e['start_at'] ?? e['startAt'])?.toString();
+        if (startAt == null || startAt.isEmpty) continue;
+        final dt = _parseAmeliaDateTime(startAt);
+        if (dt == null) continue;
+        final dateKey = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        final endAt = (e['end_at'] ?? e['endAt'])?.toString();
+        final title = e['title']?.toString() ?? 'Sesión Theta Fénix';
+        out[dateKey] = {
+          'date': dt,
+          'title': title,
+          'start_at': startAt,
+          'end_at': endAt ?? '',
+          'time': _formatTime(startAt),
+          'duration': _durationFromStartEnd(startAt, endAt),
+          'id': e['id'] ?? e['event_id'],
         };
       }
-      return {
-        'pageInfo': null,
-        'sessions': <Map<String, dynamic>>[],
-      };
+      return out;
     } catch (e) {
-      debugPrint('❌ Error obteniendo sesiones de THETAFENIX: $e');
-      return {
-        'pageInfo': null,
-        'sessions': <Map<String, dynamic>>[],
-      };
+      debugPrint('❌ getThetaFenixSessions: $e');
+      return {};
     }
   }
 
-  /// Parsear sesiones del HTML
-  List<Map<String, dynamic>> _parseSessionsFromHTML(String htmlContent) {
-    final sessions = <Map<String, dynamic>>[];
-    
-    // Regex para encontrar fechas y enlaces (solo para extraer fechas, no usamos los enlaces)
-    final sessionRegex = RegExp(
-      r'<h3[^>]*class="[^"]*elementor-heading-title[^"]*"[^>]*>([^<]+)</h3>',
-      multiLine: true,
-      dotAll: true,
-    );
-    
-    final matches = sessionRegex.allMatches(htmlContent);
-    
-    for (final match in matches) {
-      final dateText = match.group(1)?.trim() ?? '';
-      
-      // Parsear la fecha
-      final dateMatch = RegExp(r'([A-Za-záéíóúñÁÉÍÓÚÑ]+)\s+(\d+)\s+([A-Za-záéíóúñÁÉÍÓÚÑ]+)').firstMatch(dateText);
-      if (dateMatch != null) {
-        final dayName = dateMatch.group(1) ?? '';
-        final day = int.tryParse(dateMatch.group(2) ?? '') ?? 0;
-        final month = dateMatch.group(3) ?? '';
-        final year = 2025; // Año actual
-        
-        sessions.add({
-          'id': 'session-${sessions.length + 1}',
-          'date': '$day $month $year',
-          'dayName': dayName,
-          'day': day,
-          'month': month,
-          'year': year,
-          'time': '8:30 PM CDMX',
-          'duration': '1.5 hrs',
-          'modality': 'Online por Zoom',
-        });
+  static DateTime? _parseAmeliaDateTime(String s) {
+    if (s.length >= 10) {
+      final parts = s.substring(0, 10).split('-');
+      if (parts.length == 3) {
+        final y = int.tryParse(parts[0]);
+        final m = int.tryParse(parts[1]);
+        final d = int.tryParse(parts[2]);
+        if (y != null && m != null && d != null) return DateTime(y, m, d);
       }
     }
-    
-    // Ordenar sesiones por fecha
-    final months = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
-    
-    sessions.sort((a, b) {
-      final aMonthIndex = months.indexOf(a['month'] as String);
-      final bMonthIndex = months.indexOf(b['month'] as String);
-      
-      if (aMonthIndex != bMonthIndex) {
-        return aMonthIndex.compareTo(bMonthIndex);
+    return null;
+  }
+
+  static String _formatTime(String dateTimeStr) {
+    if (dateTimeStr.length < 16) return '';
+    final sep = dateTimeStr.length > 10 ? dateTimeStr[10] : '';
+    final t = (sep == ' ') ? dateTimeStr.substring(12, 17) : dateTimeStr.substring(11, 16);
+    final parts = t.split(':');
+    if (parts.length >= 2) {
+      final h = int.tryParse(parts[0].trim()) ?? 0;
+      final m = parts[1].trim();
+      if (h >= 0 && h <= 23) return '${h.toString().padLeft(2, '0')}:$m';
+    }
+    return '';
+  }
+
+  static String _durationFromStartEnd(String? start, String? end) {
+    if (start == null || end == null || start.isEmpty || end.isEmpty) return '';
+    try {
+      final s = DateTime.tryParse(start);
+      final e = DateTime.tryParse(end);
+      if (s != null && e != null && e.isAfter(s)) {
+        final min = e.difference(s).inMinutes;
+        if (min >= 60) return '${min ~/ 60} h ${min % 60} min';
+        return '$min min';
       }
-      return (a['day'] as int).compareTo(b['day'] as int);
-    });
-    
-    return sessions;
+    } catch (_) {}
+    return '';
   }
 
   // ============================================
@@ -861,6 +834,21 @@ class WordPressService {
     } catch (e) {
       debugPrint('❌ getActivityCalendar: $e');
       return {};
+    }
+  }
+
+  /// Diccionarios con membresía. GET fenix/v1/dictionaries-membresia?email=...
+  Future<List<Map<String, dynamic>>> getDictionariesMembresia(String email) async {
+    try {
+      final uri = Uri.parse('$baseUrl/dictionaries-membresia?email=${Uri.encodeComponent(email)}');
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return [];
+      final body = jsonDecode(response.body);
+      final list = body is List ? body : (body is Map && body['data'] is List) ? (body['data'] as List) : (body is Map && body['items'] is List) ? (body['items'] as List) : <dynamic>[];
+      return list.whereType<Map<String, dynamic>>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      debugPrint('❌ getDictionariesMembresia: $e');
+      return [];
     }
   }
 

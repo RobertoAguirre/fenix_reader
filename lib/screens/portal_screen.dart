@@ -66,15 +66,16 @@ class _PortalScreenState extends State<PortalScreen> {
 
   // Estado para PORTALES (diccionarios/documentos)
   final TextEditingController _documentsSearchController = TextEditingController();
+  List<Map<String, dynamic>> _dictionariesMembresia = [];
+  bool _dictionariesLoading = false;
+  bool _dictionariesLoaded = false;
+  static final WordPressService _wpService = WordPressService();
 
   @override
   void initState() {
     super.initState();
-    // Cargar programas cuando se monta el widget
     _loadProgramsIfNeeded();
-    // Cargar favoritos cuando se monta el widget
     _loadFavorites();
-    // Listar videos de Vimeo para identificar URLs correctas
     _listVimeoVideos();
   }
 
@@ -508,6 +509,26 @@ class _PortalScreenState extends State<PortalScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    Builder(
+                      builder: (context) {
+                        final desc = _cleanDescription(
+                          program['post_excerpt'] as String? ?? program['description'] as String? ?? '',
+                        );
+                        if (desc.isEmpty) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            desc,
+                            style: AppTypography.ralewayRegular(
+                              fontSize: 10,
+                              color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -750,7 +771,7 @@ class _PortalScreenState extends State<PortalScreen> {
                     : _buildGradientFallback(item),
               ),
             ),
-            // Contenido
+            // Contenido: título y descripción
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -769,6 +790,18 @@ class _PortalScreenState extends State<PortalScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (item.description != null && item.description!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _cleanDescription(item.description!),
+                        style: AppTypography.ralewayRegular(
+                          fontSize: 10,
+                          color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1521,12 +1554,14 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Construir contenido de PORTALES (Tab 0)
   Widget _buildPortalesContent() {
+    if (!_dictionariesLoaded && !_dictionariesLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadDictionariesMembresia());
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Título
           Center(
             child: Text(
               'Fénix alquimista',
@@ -1538,8 +1573,6 @@ class _PortalScreenState extends State<PortalScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          
-          // Descripción
           Text(
             'Recursos exclusivos para almas comprometidas en su camino.',
             style: AppTypography.ralewayRegular(
@@ -1549,24 +1582,44 @@ class _PortalScreenState extends State<PortalScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 20),
-          
-          // Video promocional
           _PortalesVideoPlayer(
             key: ValueKey('portales_$_selectedTab'),
             videoUrl: AppConstants.portalesVideoUrl,
           ),
           const SizedBox(height: 24),
-          
-          // Buscador (mismo patrón que Hipnosis/Meditaciones)
           _buildDocumentsSearchBar(),
           const SizedBox(height: 8),
-          
-          // Lista de documentos
           _buildDocumentsList(),
           const SizedBox(height: 24),
         ],
       ),
     );
+  }
+
+  Future<void> _loadDictionariesMembresia() async {
+    final email = context.read<AuthProvider>().user?.email;
+    if (email == null || email.isEmpty) {
+      if (mounted) setState(() { _dictionariesLoaded = true; });
+      return;
+    }
+    if (!mounted) return;
+    setState(() { _dictionariesLoading = true; });
+    final raw = await _wpService.getDictionariesMembresia(email);
+    if (!mounted) return;
+    final list = raw.map((e) {
+      return <String, dynamic>{
+        'id': (e['id'] ?? '').toString(),
+        'titulo': (e['titulo'] ?? e['title'] ?? '').toString(),
+        'descripcion': (e['descripcion'] ?? e['description'] ?? '').toString(),
+        'url': (e['url'] ?? e['download_url'] ?? e['link'] ?? e['pdf_url'] ?? '').toString(),
+        'coverUrl': (e['coverUrl'] ?? e['cover_url'] ?? e['image'] ?? e['image_url'] ?? e['thumbnail'] ?? e['thumb'] ?? e['featured_image'] ?? e['picture'] ?? e['poster'] ?? '').toString(),
+      };
+    }).where((e) => (e['url'] as String).isNotEmpty).toList();
+    setState(() {
+      _dictionariesMembresia = list;
+      _dictionariesLoading = false;
+      _dictionariesLoaded = true;
+    });
   }
 
   /// Buscador para diccionarios/documentos (mismo estilo que Hipnosis)
@@ -1755,7 +1808,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Icon(
                 _showFavoritesOnly ? Icons.favorite : Icons.favorite_border,
                 size: 24,
-                color: _showFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                color: _showFavoritesOnly ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -1988,7 +2041,7 @@ class _PortalScreenState extends State<PortalScreen> {
                           child: Icon(
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             size: 20,
-                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                            color: isFavorite ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -1997,18 +2050,37 @@ class _PortalScreenState extends State<PortalScreen> {
                 ),
               ),
             ),
-            // Título - tamaño fijo
+            // Título y descripción
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(
-                item.title,
-                style: AppTypography.ralewayBold(
-                  fontSize: 12,
-                  color: AppColors.raizSagrada,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.title,
+                    style: AppTypography.ralewayBold(
+                      fontSize: 12,
+                      color: AppColors.raizSagrada,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (item.description != null && item.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _cleanDescription(item.description!),
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 10,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -2163,7 +2235,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Icon(
                 _showMeditationsFavoritesOnly ? Icons.favorite : Icons.favorite_border,
                 size: 24,
-                color: _showMeditationsFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                color: _showMeditationsFavoritesOnly ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -2283,7 +2355,7 @@ class _PortalScreenState extends State<PortalScreen> {
                           child: Icon(
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             size: 20,
-                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                            color: isFavorite ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -2292,18 +2364,37 @@ class _PortalScreenState extends State<PortalScreen> {
                 ),
               ),
             ),
-            // Título - tamaño fijo
+            // Título y descripción
             Padding(
               padding: const EdgeInsets.all(8),
-              child: Text(
-                item.title,
-                style: AppTypography.ralewayBold(
-                  fontSize: 12,
-                  color: AppColors.raizSagrada,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.title,
+                    style: AppTypography.ralewayBold(
+                      fontSize: 12,
+                      color: AppColors.raizSagrada,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (item.description != null && item.description!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _cleanDescription(item.description!),
+                      style: AppTypography.ralewayRegular(
+                        fontSize: 10,
+                        color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -2312,9 +2403,15 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Lista de documentos disponibles
+  /// Lista de documentos disponibles (solo desde backend dictionaries-membresia)
   Widget _buildDocumentsList() {
-    final documents = _getAvailableDocuments();
+    if (_dictionariesLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator(color: AppColors.raizSagrada)),
+      );
+    }
+    final documents = _dictionariesMembresia;
     final searchQuery = _documentsSearchController.text.toLowerCase().trim();
     final filtered = searchQuery.isEmpty
         ? documents
@@ -2325,7 +2422,21 @@ class _PortalScreenState extends State<PortalScreen> {
           }).toList();
 
     if (filtered.isEmpty) {
-      return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Text(
+            documents.isEmpty
+                ? 'No hay diccionarios disponibles con tu membresía'
+                : 'Ningún diccionario coincide con la búsqueda',
+            style: AppTypography.ralewayRegular(
+              fontSize: 14,
+              color: AppColors.raizSagrada.withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
 
     return Column(
@@ -2336,34 +2447,7 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Obtener documentos disponibles (PDFs de Google Docs)
-  List<Map<String, dynamic>> _getAvailableDocuments() {
-    return [
-      {
-        'id': '1',
-        'titulo': 'Mensajes del universo',
-        'descripcion': 'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
-        'url': 'https://docs.google.com/document/d/1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk/export?format=pdf',
-        'coverUrl': 'https://drive.google.com/thumbnail?id=1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk&sz=w300',
-      },
-      {
-        'id': '2',
-        'titulo': 'Astrología',
-        'descripcion': 'Descubre la energía de la luna y fases astrológicas para usar a tu favor',
-        'url': 'https://docs.google.com/document/d/17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do/export?format=pdf',
-        'coverUrl': 'https://drive.google.com/thumbnail?id=17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do&sz=w300',
-      },
-      {
-        'id': '3',
-        'titulo': 'Emociones',
-        'descripcion': 'Descubre el mensaje detrás de tus emociones y recuerda quién eres',
-        'url': 'https://docs.google.com/document/d/1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60/export?format=pdf',
-        'coverUrl': 'https://drive.google.com/thumbnail?id=1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60&sz=w300',
-      },
-    ];
-  }
-
-  /// Portada o icono del documento
+  /// Portada o icono del documento (si el backend envía coverUrl se usa; si no, placeholder con inicial)
   Widget _documentCover(Map<String, dynamic> document) {
     final coverUrl = document['coverUrl'] as String?;
     const size = 48.0;
@@ -2371,28 +2455,42 @@ class _PortalScreenState extends State<PortalScreen> {
       return SizedBox(
         width: size,
         height: size,
-        child: CachedNetworkImage(
-          imageUrl: coverUrl,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
-            color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
-            child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
-          ),
-          errorWidget: (_, __, ___) => Container(
-            color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
-            child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: CachedNetworkImage(
+            imageUrl: coverUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => _documentCoverPlaceholder(document, size),
+            errorWidget: (_, __, ___) => _documentCoverPlaceholder(document, size),
           ),
         ),
       );
     }
+    return _documentCoverPlaceholder(document, size);
+  }
+
+  Widget _documentCoverPlaceholder(Map<String, dynamic> document, double size) {
+    final titulo = (document['titulo'] as String? ?? '').trim();
+    final initial = titulo.isNotEmpty ? titulo[0].toUpperCase() : '?';
+    final hue = (initial.codeUnitAt(0) % 360).toDouble();
+    final color = HSVColor.fromAHSV(1.0, hue, 0.25, 0.95).toColor();
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.expansionAlquimica.withValues(alpha: 0.1),
+        color: color,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.raizSagrada.withValues(alpha: 0.2)),
       ),
-      child: Icon(Icons.picture_as_pdf_rounded, color: AppColors.expansionAlquimica, size: 28),
+      child: Center(
+        child: Text(
+          initial,
+          style: AppTypography.ralewayBold(
+            fontSize: 22,
+            color: AppColors.raizSagrada,
+          ),
+        ),
+      ),
     );
   }
 
@@ -2552,17 +2650,6 @@ class _PortalScreenState extends State<PortalScreen> {
               style: AppTypography.ralewayBold(
                 fontSize: 16,
                 color: AppColors.raizSagrada,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(
-              'Para personas mayores de 12 años',
-              style: AppTypography.ralewayRegular(
-                fontSize: 14,
-                color: AppColors.raizSagrada.withValues(alpha: 0.8),
               ),
               textAlign: TextAlign.center,
             ),
@@ -2738,7 +2825,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Icon(
                 _showTappingsFavoritesOnly ? Icons.favorite : Icons.favorite_border,
                 size: 24,
-                color: _showTappingsFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                color: _showTappingsFavoritesOnly ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -2870,7 +2957,7 @@ class _PortalScreenState extends State<PortalScreen> {
                           child: Icon(
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             size: 20,
-                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                            color: isFavorite ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -3203,7 +3290,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Icon(
                 _showClasesFavoritesOnly ? Icons.favorite : Icons.favorite_border,
                 size: 24,
-                color: _showClasesFavoritesOnly ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                color: _showClasesFavoritesOnly ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -3335,7 +3422,7 @@ class _PortalScreenState extends State<PortalScreen> {
                           child: Icon(
                             isFavorite ? Icons.favorite : Icons.favorite_border,
                             size: 20,
-                            color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.4),
+                            color: isFavorite ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.4),
                           ),
                         ),
                       ),
@@ -3384,8 +3471,48 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   /// Mostrar modal con video completo de clase
+  /// Si el backend no envía video_url, se usa un mapa temporal por título (clave única en minúsculas).
   void _showClaseModal(ContentItem clase) {
-    if (clase.downloadUrl == null || clase.downloadUrl!.isEmpty) {
+    String? videoUrl = clase.downloadUrl;
+    if (videoUrl == null || videoUrl.isEmpty) {
+      // Mapeo temporal: clave = texto único del título (minúsculas). El cliente puede añadir una palabra al título en backend para identificar mejor.
+      const claseVideoMap = {
+        'abundancia 888': 'https://vimeo.com/1107909912',
+        'claridad y direccion': 'https://vimeo.com/1107909480',
+        'claridad y dirección': 'https://vimeo.com/1107909480',
+        'la procrastinación': 'https://vimeo.com/1097062328',
+        'la procrastinacion': 'https://vimeo.com/1097062328',
+        'procrastinación': 'https://vimeo.com/1097062328',
+        'procrastinacion': 'https://vimeo.com/1097062328',
+        'lenguajes del amor': 'https://vimeo.com/1097062442',
+        'lenguaje del amor': 'https://vimeo.com/1097062442',
+        'recordar para liberar': 'https://vimeo.com/1097062720',
+        'recordar para liberar 5d': 'https://vimeo.com/1097062720',
+        'valentía y propósito': 'https://vimeo.com/1097062561',
+        'valentia y proposito': 'https://vimeo.com/1097062561',
+        'sanación financiera': 'https://vimeo.com/1097062629',
+        'sanacion financiera': 'https://vimeo.com/1097062629',
+        'relaciones conscientes': 'https://vimeo.com/1097062823',
+        'el propósito': 'https://vimeo.com/1097062243',
+        'el proposito': 'https://vimeo.com/1097062243',
+        'el oráculo': 'https://vimeo.com/1097062071',
+        'el oraculo': 'https://vimeo.com/1097062071',
+        'activando poder creador': 'https://vimeo.com/1097061397',
+        'poder creador': 'https://vimeo.com/1097061397',
+        'cerrar ciclos': 'https://vimeo.com/1097061626',
+        'cerrando ciclos': 'https://vimeo.com/1097061626',
+        'creencias limitantes': 'https://vimeo.com/1097061727',
+        'el merecimiento': 'https://vimeo.com/1097061925',
+      };
+      final titleLower = clase.title.toLowerCase();
+      for (final entry in claseVideoMap.entries) {
+        if (titleLower.contains(entry.key)) {
+          videoUrl = entry.value;
+          break;
+        }
+      }
+    }
+    if (videoUrl == null || videoUrl.isEmpty || videoUrl == 'https://vimeo.com/') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No hay video disponible para ${clase.title}'),
@@ -3440,7 +3567,7 @@ class _PortalScreenState extends State<PortalScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _TappingVideoPlayer(
-                  videoUrl: clase.downloadUrl!,
+                  videoUrl: videoUrl!,
                   title: clase.title,
                 ),
               ),

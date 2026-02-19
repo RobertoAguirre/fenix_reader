@@ -4,7 +4,6 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../widgets/fenix_bottom_nav.dart';
-import '../widgets/moon_phase_icon.dart';
 import '../providers/auth_provider.dart';
 import '../providers/calendar_refresh_provider.dart';
 import 'calendar_screen.dart';
@@ -41,21 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      body: Stack(
-        children: [
-          _screens[_currentIndex],
-          Positioned(
-            top: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 8, right: 12),
-                child: const MoonPhaseIcon(),
-              ),
-            ),
-          ),
-        ],
-      ),
+      body: _screens[_currentIndex],
       bottomNavigationBar: FenixBottomNav(
         currentIndex: _currentIndex,
         onTap: (index) {

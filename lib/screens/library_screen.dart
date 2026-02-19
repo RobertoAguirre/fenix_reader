@@ -440,7 +440,7 @@ class _LibraryListItem extends StatelessWidget {
                 ),
                 child: Icon(
                   isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: isFavorite ? AppColors.ascenso : AppColors.white,
+                  color: isFavorite ? AppColors.expansionAlquimica : AppColors.white,
                   size: 18,
                 ),
               ),

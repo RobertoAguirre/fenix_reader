@@ -98,7 +98,7 @@ class ContentListItem extends StatelessWidget {
               onTap: onFavoriteTap,
               child: Icon(
                 isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? AppColors.ascenso : AppColors.raizSagrada.withValues(alpha: 0.25),
+                color: isFavorite ? AppColors.expansionAlquimica : AppColors.raizSagrada.withValues(alpha: 0.25),
                 size: 24,
               ),
             ),
