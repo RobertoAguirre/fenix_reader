@@ -852,6 +852,27 @@ class WordPressService {
     }
   }
 
+  /// Portada de un attachment (solo lectura wp/v2/media). No afecta dictionaries-membresia.
+  Future<String?> getMediaThumbnailUrl(int mediaId) async {
+    try {
+      final uri = Uri.parse('$wpBaseUrl/media/$mediaId');
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return null;
+      final details = body['media_details'];
+      if (details is! Map<String, dynamic>) return null;
+      final sizes = details['sizes'];
+      if (sizes is! Map<String, dynamic>) return null;
+      final thumb = sizes['thumbnail'] ?? sizes['medium'] ?? sizes['large'];
+      if (thumb is! Map) return null;
+      final url = thumb['source_url']?.toString();
+      return url != null && url.isNotEmpty ? url : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Obtener mensajes diarios (push-log). GET fenix/v1/push-log?from=YYYY-MM-DD&to=YYYY-MM-DD
   /// Backend devuelve: title, message, sent_day, sent_at, segment (array o objeto con lista dentro).
   Future<List<DailyMessage>> getPushLog(DateTime from, DateTime to) async {

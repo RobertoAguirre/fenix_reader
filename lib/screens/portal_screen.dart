@@ -1606,15 +1606,24 @@ class _PortalScreenState extends State<PortalScreen> {
     setState(() { _dictionariesLoading = true; });
     final raw = await _wpService.getDictionariesMembresia(email);
     if (!mounted) return;
-    final list = raw.map((e) {
-      return <String, dynamic>{
+    final list = <Map<String, dynamic>>[];
+    for (final e in raw) {
+      final url = (e['url'] ?? e['download_url'] ?? e['link'] ?? e['pdf_url'] ?? '').toString();
+      if (url.isEmpty) continue;
+      String coverUrl = (e['coverUrl'] ?? e['cover_url'] ?? e['image'] ?? e['image_url'] ?? e['thumbnail'] ?? e['thumb'] ?? e['featured_image'] ?? e['picture'] ?? e['poster'] ?? '').toString();
+      if (coverUrl.isEmpty) {
+        final id = e['id'];
+        final mediaId = id is int ? id : (id != null ? int.tryParse(id.toString()) : null);
+        if (mediaId != null) coverUrl = (await _wpService.getMediaThumbnailUrl(mediaId)) ?? '';
+      }
+      list.add(<String, dynamic>{
         'id': (e['id'] ?? '').toString(),
         'titulo': (e['titulo'] ?? e['title'] ?? '').toString(),
         'descripcion': (e['descripcion'] ?? e['description'] ?? '').toString(),
-        'url': (e['url'] ?? e['download_url'] ?? e['link'] ?? e['pdf_url'] ?? '').toString(),
-        'coverUrl': (e['coverUrl'] ?? e['cover_url'] ?? e['image'] ?? e['image_url'] ?? e['thumbnail'] ?? e['thumb'] ?? e['featured_image'] ?? e['picture'] ?? e['poster'] ?? '').toString(),
-      };
-    }).where((e) => (e['url'] as String).isNotEmpty).toList();
+        'url': url,
+        'coverUrl': coverUrl,
+      });
+    }
     setState(() {
       _dictionariesMembresia = list;
       _dictionariesLoading = false;
