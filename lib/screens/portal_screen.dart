@@ -2460,7 +2460,7 @@ class _PortalScreenState extends State<PortalScreen> {
         child: Center(
           child: Text(
             baseList.isEmpty
-                ? 'No hay diccionarios disponibles con tu membresía'
+                ? 'Aún no tienes este contenido'
                 : 'Ningún diccionario coincide con la búsqueda',
             style: AppTypography.ralewayRegular(
               fontSize: 14,

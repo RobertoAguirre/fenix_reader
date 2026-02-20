@@ -103,6 +103,9 @@ class WordPressService {
         if (decoded is List) {
           purchasesData = decoded;
         } else if (decoded is Map<String, dynamic>) {
+          if (decoded['success'] == false) {
+            return [];
+          }
           purchasesData = decoded['purchases'] as List<dynamic>? ??
                  decoded['items'] as List<dynamic>? ??
                  decoded['data'] as List<dynamic>? ??
@@ -1180,11 +1183,16 @@ class ContentItem {
     else if (json['downloadUrl'] != null && json['downloadUrl'].toString().isNotEmpty) {
       downloadUrl = json['downloadUrl'] as String?;
     }
-    // 3. download_urls (plural, array - tomar el primero)
+    // 3. download_urls (plural, array - tomar el primero; puede ser string o objeto con url/link)
     else if (json['download_urls'] != null) {
       final urls = json['download_urls'];
       if (urls is List && urls.isNotEmpty) {
-        downloadUrl = urls[0].toString();
+        final first = urls[0];
+        if (first is Map) {
+          downloadUrl = (first['url'] ?? first['link'])?.toString();
+        } else {
+          downloadUrl = first.toString();
+        }
       }
     }
     // 4. file (de WooCommerce)
