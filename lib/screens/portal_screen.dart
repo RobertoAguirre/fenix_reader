@@ -12,6 +12,8 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/content_provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/membership_provider.dart';
+import '../models/membership.dart';
 import '../services/wordpress_service.dart' show WordPressService, ContentItem, ContentType, UserContent, VimeoService;
 import '../widgets/content_card.dart';
 import '../widgets/audio_player_modal.dart';
@@ -77,6 +79,10 @@ class _PortalScreenState extends State<PortalScreen> {
     _loadProgramsIfNeeded();
     _loadFavorites();
     _listVimeoVideos();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final email = context.read<AuthProvider>().user?.email;
+      if (email != null) context.read<MembershipProvider>().loadUserMemberships(email);
+    });
   }
 
   @override
@@ -1554,6 +1560,11 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Construir contenido de PORTALES (Tab 0)
   Widget _buildPortalesContent() {
+    final email = context.read<AuthProvider>().user?.email;
+    final contentProvider = context.read<ContentProvider>();
+    if (email != null && contentProvider.content == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => contentProvider.loadUserContent(email));
+    }
     if (!_dictionariesLoaded && !_dictionariesLoading) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadDictionariesMembresia());
     }
@@ -2412,7 +2423,7 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Lista de documentos disponibles (solo desde backend dictionaries-membresia)
+  /// Lista de documentos: diccionarios de membership_content (user-purchases) + dictionaries-membresia
   Widget _buildDocumentsList() {
     if (_dictionariesLoading) {
       return const Padding(
@@ -2420,11 +2431,24 @@ class _PortalScreenState extends State<PortalScreen> {
         child: Center(child: CircularProgressIndicator(color: AppColors.raizSagrada)),
       );
     }
-    final documents = _dictionariesMembresia;
+    final fromMembresia = _dictionariesMembresia;
+    final seenUrls = fromMembresia.map((d) => (d['url'] as String? ?? '').toString()).where((u) => u.isNotEmpty).toSet();
+    final fromContent = context.read<ContentProvider>().all
+        .where((item) => item.type == ContentType.diccionario)
+        .map((item) => <String, dynamic>{
+              'id': item.id.toString(),
+              'titulo': item.title,
+              'descripcion': item.description ?? '',
+              'url': item.downloadUrl ?? '',
+              'coverUrl': '',
+            })
+        .where((d) => (d['url'] as String?).toString().isNotEmpty && !seenUrls.contains((d['url'] as String?).toString()))
+        .toList();
+    final baseList = <Map<String, dynamic>>[...fromMembresia, ...fromContent];
     final searchQuery = _documentsSearchController.text.toLowerCase().trim();
     final filtered = searchQuery.isEmpty
-        ? documents
-        : documents.where((doc) {
+        ? baseList
+        : baseList.where((doc) {
             final titulo = (doc['titulo'] as String? ?? '').toLowerCase();
             final descripcion = (doc['descripcion'] as String? ?? '').toLowerCase();
             return titulo.contains(searchQuery) || descripcion.contains(searchQuery);
@@ -2435,7 +2459,7 @@ class _PortalScreenState extends State<PortalScreen> {
         padding: const EdgeInsets.all(24),
         child: Center(
           child: Text(
-            documents.isEmpty
+            baseList.isEmpty
                 ? 'No hay diccionarios disponibles con tu membresía'
                 : 'Ningún diccionario coincide con la búsqueda',
             style: AppTypography.ralewayRegular(
@@ -3144,7 +3168,11 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Construir contenido de CLASES
   Widget _buildClasesContent(ContentProvider provider) {
-    final allClases = _getClases(provider);
+    List<ContentItem> allClases = _getClases(provider);
+    final active = context.read<MembershipProvider>().activeMemberships;
+    final hasDespertar = active.any((m) => m.type == MembershipType.despertar);
+    final hasMaestria = active.any((m) => m.type == MembershipType.maestria);
+    if (hasDespertar && !hasMaestria) allClases = [];
     final filteredClases = _getFilteredClasesItems(allClases);
     final isLoading = provider.isLoading;
 

@@ -22,16 +22,37 @@ class Membership {
   });
 
   factory Membership.fromJson(Map<String, dynamic> json) {
+    final title = json['title'] as String? ?? json['name'] as String? ?? '';
+    final tier = json['tier'] as String?;
     return Membership(
-      id: json['id'] as int? ?? 0,
-      title: json['title'] as String? ?? '',
+      id: json['id'] as int? ?? json['product_id'] as int? ?? 0,
+      title: title,
       slug: json['slug'] as String? ?? '',
       description: json['description'] as String?,
       excerpt: json['excerpt'] as String?,
       image: json['image'] as String?,
       permalink: json['permalink'] as String?,
-      type: _parseType(json['title'] as String? ?? ''),
+      type: _typeFromTier(tier) ?? _parseType(title),
     );
+  }
+
+  static MembershipType? _typeFromTier(String? tier) {
+    if (tier == null || tier.isEmpty) return null;
+    switch (tier.toLowerCase()) {
+      case 'raiz':
+      case 'raíz':
+        return MembershipType.raiz;
+      case 'conexion':
+      case 'conexión':
+        return MembershipType.conexion;
+      case 'despertar':
+        return MembershipType.despertar;
+      case 'maestria':
+      case 'maestría':
+        return MembershipType.maestria;
+      default:
+        return null;
+    }
   }
 
   Map<String, dynamic> toJson() {

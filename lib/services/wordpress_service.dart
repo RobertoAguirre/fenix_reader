@@ -140,9 +140,12 @@ class WordPressService {
         
         for (final item in membershipData) {
           if (item is Map<String, dynamic>) {
-            final pid = item['product_id'] as int? ?? item['id'] as int? ?? 0;
-            if (seenIds.add(pid)) {
+            final isDiccionario = (item['type'] as String? ?? '').toLowerCase() == 'diccionario';
+            if (isDiccionario) {
               mergedData.add(item);
+            } else {
+              final pid = item['product_id'] as int? ?? item['id'] as int? ?? 0;
+              if (seenIds.add(pid)) mergedData.add(item);
             }
           }
         }
@@ -942,7 +945,7 @@ class WordPressService {
 }
 
 /// Tipo de contenido
-enum ContentType { hipnosis, meditacion, otro }
+enum ContentType { hipnosis, meditacion, diccionario, otro }
 
 /// Contenido del usuario (adquirido en web externa)
 class UserContent {
@@ -1107,7 +1110,7 @@ class VimeoService {
   }
 }
 
-/// Item de contenido (meditación, hipnosis, etc.)
+/// Item de contenido (meditación, hipnosis, diccionario, etc.)
 class ContentItem {
   final int id;
   final int? woocommerceId;
@@ -1116,6 +1119,8 @@ class ContentItem {
   final String? category;
   final String? image;
   final String? downloadUrl;
+  /// Tipo enviado por el backend (ej. "diccionario")
+  final String? typeFromApi;
 
   ContentItem({
     required this.id,
@@ -1125,26 +1130,28 @@ class ContentItem {
     this.category,
     this.image,
     this.downloadUrl,
+    this.typeFromApi,
   });
 
-  /// Detectar tipo por título o categoría
+  /// Detectar tipo por API, título o categoría
   ContentType get type {
+    final apiType = typeFromApi?.toLowerCase();
+    if (apiType == 'diccionario') return ContentType.diccionario;
+
     final lowerTitle = title.toLowerCase();
     final lowerCategory = (category ?? '').toLowerCase();
-    
-    if (lowerTitle.contains('meditación') || 
+
+    if (lowerTitle.contains('meditación') ||
         lowerTitle.contains('meditacion') ||
         lowerCategory.contains('meditación') ||
         lowerCategory.contains('meditacion')) {
       return ContentType.meditacion;
     }
-    
-    if (lowerTitle.contains('hipnosis') || 
-        lowerCategory.contains('hipnosis')) {
+
+    if (lowerTitle.contains('hipnosis') || lowerCategory.contains('hipnosis')) {
       return ContentType.hipnosis;
     }
-    
-    // Por defecto, asumir hipnosis si no tiene prefijo claro
+
     return ContentType.hipnosis;
   }
 
@@ -1210,6 +1217,10 @@ class ContentItem {
       final videoId = json['video_id'].toString();
       downloadUrl = 'https://vimeo.com/$videoId';
     }
+    // 11. url (diccionarios desde membership_content)
+    else if (json['url'] != null && json['url'].toString().isNotEmpty) {
+      downloadUrl = json['url'] as String?;
+    }
     
     // Convertir URL de "manage" a URL de visualización si es necesario
     if (downloadUrl != null && downloadUrl.contains('vimeo.com/manage/videos/')) {
@@ -1228,27 +1239,35 @@ class ContentItem {
     }
     
     return ContentItem(
-      id: json['id'] as int? ?? 
-          json['product_id'] as int? ?? 
-          json['post_id'] as int? ?? 0,
+      id: json['id'] as int? ??
+          json['product_id'] as int? ??
+          json['post_id'] as int? ??
+          _hashCodeForDiccionario(json),
       woocommerceId: json['woocommerce_id'] as int? ?? json['product_id'] as int?,
-      title: json['title'] as String? ?? 
-             json['post_title'] as String? ?? 
-             json['name'] as String? ?? 
-             'Sin título',
-      description: json['description'] as String? ?? 
-                   json['excerpt'] as String? ??
-                   json['content'] as String? ??
-                   json['post_content'] as String? ??
-                   json['summary'] as String?,
-      category: json['category'] as String? ?? 
-                (json['categories'] is List && (json['categories'] as List).isNotEmpty
-                    ? (json['categories'] as List)[0].toString()
-                    : null),
-      image: json['image'] as String? ?? 
-             json['image_url'] as String? ?? 
-             json['thumbnail'] as String?,
+      title: json['title'] as String? ??
+          json['post_title'] as String? ??
+          json['name'] as String? ??
+          'Sin título',
+      description: json['description'] as String? ??
+          json['excerpt'] as String? ??
+          json['content'] as String? ??
+          json['post_content'] as String? ??
+          json['summary'] as String?,
+      category: json['category'] as String? ??
+          (json['categories'] is List && (json['categories'] as List).isNotEmpty
+              ? (json['categories'] as List)[0].toString()
+              : null),
+      image: json['image'] as String? ??
+          json['image_url'] as String? ??
+          json['thumbnail'] as String?,
       downloadUrl: downloadUrl,
+      typeFromApi: json['type'] as String?,
     );
+  }
+
+  static int _hashCodeForDiccionario(Map<String, dynamic> json) {
+    final u = json['url']?.toString() ?? '';
+    final t = json['title']?.toString() ?? '';
+    return (u + t).hashCode.abs();
   }
 }
