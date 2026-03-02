@@ -4155,6 +4155,12 @@ class _DocumentViewerState extends State<_DocumentViewer> {
   int _totalPages = 0;
   double _currentZoom = 1.0;
 
+  // Estado de búsqueda en el PDF
+  PdfTextSearchResult? _searchResult;
+  bool _isSearchMode = false;
+  final TextEditingController _searchTextController = TextEditingController();
+  bool _isSearchingText = false;
+
   @override
   void initState() {
     super.initState();
@@ -4167,6 +4173,7 @@ class _DocumentViewerState extends State<_DocumentViewer> {
   void dispose() {
     _disableScreenshotProtection();
     _pdfController.dispose();
+    _searchTextController.dispose();
     super.dispose();
   }
   
@@ -4244,6 +4251,61 @@ class _DocumentViewerState extends State<_DocumentViewer> {
     _pdfController.zoomLevel = newZoom;
   }
 
+  void _enterSearchMode() {
+    if (!_isSearchMode) {
+      setState(() {
+        _isSearchMode = true;
+      });
+    }
+  }
+
+  void _exitSearchMode() {
+    _searchTextController.clear();
+    _searchResult?.clear();
+    _searchResult = null;
+    setState(() {
+      _isSearchMode = false;
+      _isSearchingText = false;
+    });
+  }
+
+  Future<void> _performSearch(String query) async {
+    final text = query.trim();
+    if (text.isEmpty) {
+      _searchResult?.clear();
+      setState(() {
+        _searchResult = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearchingText = true;
+    });
+
+    final result = _pdfController.searchText(text);
+
+    if (!kIsWeb) {
+      result.addListener(() {
+        if (!mounted) return;
+        setState(() {});
+      });
+    }
+
+    setState(() {
+      _searchResult = result;
+      _isSearchingText = false;
+    });
+  }
+
+  void _nextSearchResult() {
+    _searchResult?.nextInstance();
+  }
+
+  void _previousSearchResult() {
+    _searchResult?.previousInstance();
+  }
+
   void _showPageSelector() {
     showDialog(
       context: context,
@@ -4261,26 +4323,63 @@ class _DocumentViewerState extends State<_DocumentViewer> {
       backgroundColor: AppColors.origen,
       appBar: AppBar(
         backgroundColor: AppColors.raizSagrada,
-        title: Text(
-          widget.document['titulo'] as String,
-          style: AppTypography.kaushanTitle(
-            fontSize: 20,
-            color: AppColors.white,
-          ),
-        ),
+        title: _isSearchMode && _pdfBytes != null
+            ? TextField(
+                controller: _searchTextController,
+                autofocus: true,
+                cursorColor: AppColors.white,
+                style: AppTypography.ralewayRegular(
+                  fontSize: 16,
+                  color: AppColors.white,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Buscar en el documento',
+                  hintStyle: AppTypography.ralewayRegular(
+                    fontSize: 14,
+                    color: AppColors.white.withValues(alpha: 0.7),
+                  ),
+                  border: InputBorder.none,
+                  filled: true,
+                  fillColor: AppColors.raizSagrada.withValues(alpha: 0.4),
+                ),
+                textInputAction: TextInputAction.search,
+                onSubmitted: _performSearch,
+              )
+            : Text(
+                widget.document['titulo'] as String,
+                style: AppTypography.kaushanTitle(
+                  fontSize: 20,
+                  color: AppColors.white,
+                ),
+              ),
         iconTheme: const IconThemeData(color: AppColors.white),
-        actions: _pdfBytes != null ? [
-          IconButton(
-            icon: const Icon(Icons.zoom_out, color: AppColors.white),
-            onPressed: _zoomOut,
-            tooltip: 'Alejar',
-          ),
-          IconButton(
-            icon: const Icon(Icons.zoom_in, color: AppColors.white),
-            onPressed: _zoomIn,
-            tooltip: 'Acercar',
-          ),
-        ] : null,
+        actions: _pdfBytes != null
+            ? [
+                if (_isSearchMode) ...[
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.white),
+                    onPressed: _exitSearchMode,
+                    tooltip: 'Cerrar búsqueda',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_up, color: AppColors.white),
+                    onPressed: (_searchResult?.hasResult ?? false) ? _previousSearchResult : null,
+                    tooltip: 'Coincidencia anterior',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.white),
+                    onPressed: (_searchResult?.hasResult ?? false) ? _nextSearchResult : null,
+                    tooltip: 'Siguiente coincidencia',
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.search, color: AppColors.white),
+                    onPressed: _enterSearchMode,
+                    tooltip: 'Buscar en el documento',
+                  ),
+                ],
+              ]
+            : null,
       ),
       body: _isLoading
           ? _buildLoadingState()
