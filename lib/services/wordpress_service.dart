@@ -687,16 +687,19 @@ class WordPressService {
     }
   }
 
-  /// Sesiones Theta Fénix desde fenix/v1/amelia-events (from/to, opcional limit).
+  /// Sesiones Theta Fénix desde fenix/v1/amelia-events (from/to). Excluye "Sesión Fénix" individual.
+  /// start_at/end_at en ISO 8601 con offset; se usa la fecha del string para evitar desfase.
   /// Devuelve mapa dateKey (YYYY-MM-DD) -> { date, title, start_at, end_at, time, duration }.
   Future<Map<String, Map<String, dynamic>>> getThetaFenixSessions({DateTime? from, DateTime? to}) async {
     try {
-      var uri = Uri.parse('$baseUrl/amelia-events');
+      final query = <String>['exclude_title_like=${Uri.encodeComponent('Sesión Fénix')}'];
       if (from != null && to != null) {
         final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
         final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
-        uri = Uri.parse('$baseUrl/amelia-events?from=$fromStr&to=$toStr');
+        query.add('from=$fromStr');
+        query.add('to=$toStr');
       }
+      final uri = Uri.parse('$baseUrl/amelia-events?${query.join('&')}');
       final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
       if (response.statusCode != 200) return {};
       final body = jsonDecode(response.body);
@@ -714,17 +717,17 @@ class WordPressService {
         if (e is! Map<String, dynamic>) continue;
         final startAt = (e['start_at'] ?? e['startAt'])?.toString();
         if (startAt == null || startAt.isEmpty) continue;
-        final dt = _parseAmeliaDateTime(startAt);
-        if (dt == null) continue;
-        final dateKey = '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+        final dateKey = _ameliaDateKeyFromIso(startAt);
+        if (dateKey == null) continue;
         final endAt = (e['end_at'] ?? e['endAt'])?.toString();
         final title = e['title']?.toString() ?? 'Sesión Theta Fénix';
+        final dt = _parseAmeliaDateKey(dateKey);
         out[dateKey] = {
           'date': dt,
           'title': title,
           'start_at': startAt,
           'end_at': endAt ?? '',
-          'time': _formatTime(startAt),
+          'time': _formatTimeIso(startAt),
           'duration': _durationFromStartEnd(startAt, endAt),
           'id': e['id'] ?? e['event_id'],
         };
@@ -736,9 +739,18 @@ class WordPressService {
     }
   }
 
-  static DateTime? _parseAmeliaDateTime(String s) {
+  /// Fecha del evento desde ISO 8601 (YYYY-MM-DD) para evitar desfase de timezone.
+  static String? _ameliaDateKeyFromIso(String s) {
     if (s.length >= 10) {
-      final parts = s.substring(0, 10).split('-');
+      final part = s.substring(0, 10);
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(part)) return part;
+    }
+    return null;
+  }
+
+  static DateTime? _parseAmeliaDateKey(String dateKey) {
+    if (dateKey.length >= 10) {
+      final parts = dateKey.substring(0, 10).split('-');
       if (parts.length == 3) {
         final y = int.tryParse(parts[0]);
         final m = int.tryParse(parts[1]);
@@ -749,10 +761,11 @@ class WordPressService {
     return null;
   }
 
-  static String _formatTime(String dateTimeStr) {
+  static String _formatTimeIso(String dateTimeStr) {
     if (dateTimeStr.length < 16) return '';
-    final sep = dateTimeStr.length > 10 ? dateTimeStr[10] : '';
-    final t = (sep == ' ') ? dateTimeStr.substring(12, 17) : dateTimeStr.substring(11, 16);
+    final idx = dateTimeStr.indexOf('T');
+    if (idx < 0) return '';
+    final t = dateTimeStr.substring(idx + 1, idx + 6);
     final parts = t.split(':');
     if (parts.length >= 2) {
       final h = int.tryParse(parts[0].trim()) ?? 0;
@@ -945,6 +958,75 @@ class WordPressService {
       return null;
     }
   }
+
+  /// Recursos Vimeo por grupo (clases, tapping, meditaciones, hipnosis). Cruce con user-purchases por related_product_id.
+  /// GET fenix/v1/resources?group=X&product_id=Y (product_id opcional).
+  Future<List<VimeoResource>> getResources({required String group, int? productId}) async {
+    try {
+      final query = <String>['group=${Uri.encodeComponent(group)}'];
+      if (productId != null) query.add('product_id=$productId');
+      final uri = Uri.parse('$baseUrl/resources?${query.join('&')}');
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return [];
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return [];
+      final success = body['success'];
+      if (success != true && success != 'true') return [];
+      final raw = body['items'] ?? body['data'];
+      final list = raw is List ? raw : <dynamic>[];
+      final out = <VimeoResource>[];
+      for (final e in list) {
+        if (e is Map<String, dynamic>) {
+          final url = e['resource_url']?.toString();
+          if (url == null || url.isEmpty) continue;
+          final rp = e['related_product_id'];
+          final relatedProductId = rp is int ? rp : (rp is num ? rp.toInt() : int.tryParse(rp?.toString() ?? ''));
+          final rid = e['resource_id'];
+          final resourceId = rid is int ? rid : (rid is num ? rid.toInt() : int.tryParse(rid?.toString() ?? '') ?? 0);
+          out.add(VimeoResource(
+            resourceId: resourceId,
+            title: e['title']?.toString() ?? '',
+            description: e['description']?.toString(),
+            resourceGroup: e['resource_group']?.toString() ?? group,
+            resourceType: e['resource_type']?.toString() ?? 'video',
+            resourceUrl: url.trim(),
+            relatedProductId: relatedProductId,
+            thumbnail: e['thumbnail']?.toString(),
+            updatedAt: e['updated_at']?.toString(),
+          ));
+        }
+      }
+      return out;
+    } catch (e) {
+      debugPrint('❌ getResources($group): $e');
+      return [];
+    }
+  }
+}
+
+/// Recurso de video Vimeo desde fenix/v1/resources (Biblioteca ACF).
+class VimeoResource {
+  final int resourceId;
+  final String title;
+  final String? description;
+  final String resourceGroup;
+  final String resourceType;
+  final String resourceUrl;
+  final int? relatedProductId;
+  final String? thumbnail;
+  final String? updatedAt;
+
+  VimeoResource({
+    required this.resourceId,
+    required this.title,
+    this.description,
+    required this.resourceGroup,
+    required this.resourceType,
+    required this.resourceUrl,
+    this.relatedProductId,
+    this.thumbnail,
+    this.updatedAt,
+  });
 }
 
 /// Tipo de contenido

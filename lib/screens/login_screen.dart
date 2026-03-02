@@ -436,29 +436,35 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Text(AppConstants.access),
                 ),
               ),
-              // Mensaje de error
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
-                      width: 1,
+              // Mensaje de error (login fallido o sesión en otro dispositivo)
+              Consumer<AuthProvider>(
+                builder: (_, authProvider, __) {
+                  final message = _errorMessage ?? authProvider.error;
+                  if (message == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        _cleanErrorMessage(message),
+                        style: AppTypography.ralewayRegular(
+                          fontSize: 13,
+                          color: AppColors.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    _errorMessage!,
-                    style: AppTypography.ralewayRegular(
-                      fontSize: 13,
-                      color: AppColors.error,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ],
+                  );
+                },
+              ),
               if (widget.onGoToRegister != null) ...[
                 const SizedBox(height: 20),
                 GestureDetector(

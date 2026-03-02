@@ -14,7 +14,7 @@ import '../providers/content_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/membership_provider.dart';
 import '../models/membership.dart';
-import '../services/wordpress_service.dart' show WordPressService, ContentItem, ContentType, UserContent, VimeoService;
+import '../services/wordpress_service.dart' show WordPressService, ContentItem, ContentType, UserContent, VimeoService, VimeoResource;
 import '../widgets/content_card.dart';
 import '../widgets/audio_player_modal.dart';
 import '../widgets/video_player_modal.dart';
@@ -73,12 +73,16 @@ class _PortalScreenState extends State<PortalScreen> {
   bool _dictionariesLoaded = false;
   static final WordPressService _wpService = WordPressService();
 
+  /// Recursos Vimeo por grupo (Biblioteca ACF). Cruce con user-purchases por related_product_id.
+  Map<String, List<VimeoResource>> _resourcesByGroup = {};
+
   @override
   void initState() {
     super.initState();
     _loadProgramsIfNeeded();
     _loadFavorites();
     _listVimeoVideos();
+    _loadVimeoResources();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final email = context.read<AuthProvider>().user?.email;
       if (email != null) context.read<MembershipProvider>().loadUserMemberships(email);
@@ -107,6 +111,36 @@ class _PortalScreenState extends State<PortalScreen> {
     if (email != null && _selectedTab == 5) {
       context.read<ContentProvider>().loadUserPrograms(email);
     }
+  }
+
+  Future<void> _loadVimeoResources() async {
+    final groups = ['hipnosis', 'meditaciones', 'tapping', 'clases'];
+    final map = <String, List<VimeoResource>>{};
+    for (final g in groups) {
+      final list = await _wpService.getResources(group: g);
+      if (list.isNotEmpty) map[g] = list;
+    }
+    if (!mounted) return;
+    setState(() => _resourcesByGroup = map);
+  }
+
+  String _promoVideoUrl(String group, String fallback) {
+    final list = _resourcesByGroup[group];
+    if (list != null && list.isNotEmpty && list.first.resourceUrl.isNotEmpty) {
+      return list.first.resourceUrl;
+    }
+    return fallback;
+  }
+
+  String? _resourceVideoUrlForContentItem(String group, ContentItem item) {
+    final list = _resourcesByGroup[group];
+    if (list == null) return null;
+    for (final r in list) {
+      final pid = r.relatedProductId;
+      if (pid == null) continue;
+      if (pid == item.id || pid == item.woocommerceId) return r.resourceUrl;
+    }
+    return null;
   }
 
   /// Limpia descripciones de palabras prohibidas (membresías, compras, etc.)
@@ -210,7 +244,7 @@ class _PortalScreenState extends State<PortalScreen> {
                   ? firstName[0].toUpperCase() + firstName.substring(1)
                   : firstName;
               return Text(
-                'Buenas tardes, $capitalizedName',
+                'Hola, $capitalizedName',
                 style: AppTypography.kaushanTitle(
                   fontSize: 28,
                   color: AppColors.expansionAlquimica,
@@ -1708,10 +1742,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional
+          // Video promocional (dinámico desde fenix/v1/resources?group=hipnosis)
           _PortalesVideoPlayer(
             key: ValueKey('hypnosis_$_selectedTab'),
-            videoUrl: AppConstants.hypnosisFenixVideoUrl,
+            videoUrl: _promoVideoUrl('hipnosis', AppConstants.hypnosisFenixVideoUrl),
           ),
           const SizedBox(height: 16),
           
@@ -2132,10 +2166,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional
+          // Video promocional (dinámico desde fenix/v1/resources?group=meditaciones)
           _PortalesVideoPlayer(
             key: ValueKey('meditations_$_selectedTab'),
-            videoUrl: AppConstants.meditationsFenixVideoUrl,
+            videoUrl: _promoVideoUrl('meditaciones', AppConstants.meditationsFenixVideoUrl),
           ),
           const SizedBox(height: 16),
           
@@ -2748,10 +2782,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional
+          // Video promocional (dinámico desde fenix/v1/resources?group=tapping)
           _PortalesVideoPlayer(
             key: ValueKey('tappings_$_selectedTab'),
-            videoUrl: AppConstants.tappingsVideoUrl,
+            videoUrl: _promoVideoUrl('tapping', AppConstants.tappingsVideoUrl),
           ),
           const SizedBox(height: 16),
           
@@ -3063,20 +3097,17 @@ class _PortalScreenState extends State<PortalScreen> {
 
   /// Mostrar modal con video completo de tapping
   void _showTappingModal(ContentItem tapping) {
-    // TODO: TEMPORAL - URLs hardcodeadas para pasar verificación de Apple.
-    // IMPORTANTE: Modificar backend de WordPress para que la API /user-purchases
-    // devuelva el campo video_url con la URL de Vimeo del tapping.
-    // Luego eliminar este mapeo y usar tapping.downloadUrl directamente.
+    // URL: 1) downloadUrl (user-purchases), 2) fenix/v1/resources?group=tapping (related_product_id), 3) fallback por título
     String? videoUrl = tapping.downloadUrl;
-    
     if (videoUrl == null || videoUrl.isEmpty) {
-      // Mapeo temporal de tappings a URLs de Vimeo
+      videoUrl = _resourceVideoUrlForContentItem('tapping', tapping);
+    }
+    if (videoUrl == null || videoUrl.isEmpty) {
       final tappingVideoMap = {
         'soltar el control': 'https://vimeo.com/1120509658',
         'desbloquear la abundancia': 'https://vimeo.com/1120509396',
         'ansiedad': 'https://vimeo.com/1120509009',
       };
-      
       final titleLower = tapping.title.toLowerCase();
       for (final entry in tappingVideoMap.entries) {
         if (titleLower.contains(entry.key)) {
@@ -3205,10 +3236,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional
+          // Video promocional (dinámico desde fenix/v1/resources?group=clases)
           _PortalesVideoPlayer(
             key: ValueKey('clases_$_selectedTab'),
-            videoUrl: AppConstants.clasesVideoUrl,
+            videoUrl: _promoVideoUrl('clases', AppConstants.clasesVideoUrl),
           ),
           const SizedBox(height: 16),
           
@@ -3508,11 +3539,13 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   /// Mostrar modal con video completo de clase
-  /// Si el backend no envía video_url, se usa un mapa temporal por título (clave única en minúsculas).
+  /// URL: 1) downloadUrl, 2) fenix/v1/resources?group=clases (related_product_id), 3) fallback por título.
   void _showClaseModal(ContentItem clase) {
     String? videoUrl = clase.downloadUrl;
     if (videoUrl == null || videoUrl.isEmpty) {
-      // Mapeo temporal: clave = texto único del título (minúsculas). El cliente puede añadir una palabra al título en backend para identificar mejor.
+      videoUrl = _resourceVideoUrlForContentItem('clases', clase);
+    }
+    if (videoUrl == null || videoUrl.isEmpty) {
       const claseVideoMap = {
         'abundancia 888': 'https://vimeo.com/1107909912',
         'claridad y direccion': 'https://vimeo.com/1107909480',
@@ -3662,11 +3695,12 @@ class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
 
   Future<void> _loadVideo() async {
     try {
-      // Verificar si es URL de Vimeo
+      // Verificar si es URL de Vimeo (vimeo.com/ID o player.vimeo.com/video/ID)
       final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
-      if (vimeoMatch != null) {
+      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(widget.videoUrl);
+      final videoId = vimeoMatch?.group(1) ?? playerMatch?.group(1);
+      if (videoId != null) {
         // Es Vimeo - usar VimeoService para obtener URL directa
-        final videoId = vimeoMatch.group(1)!;
         final vimeoService = VimeoService();
         final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
         
@@ -4007,17 +4041,17 @@ class _PortalesVideoPlayerState extends State<_PortalesVideoPlayer> {
 
   Future<void> _loadVideo() async {
     try {
-      // Extraer ID de Vimeo de la URL
+      // Extraer ID de Vimeo (vimeo.com/ID o player.vimeo.com/video/ID)
       final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
-      if (vimeoMatch == null) {
+      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(widget.videoUrl);
+      final videoId = vimeoMatch?.group(1) ?? playerMatch?.group(1);
+      if (videoId == null) {
         setState(() {
           _hasError = true;
           _isLoading = false;
         });
         return;
       }
-
-      final videoId = vimeoMatch.group(1)!;
       
       // Obtener URL directa usando API de Vimeo
       final vimeoService = VimeoService();

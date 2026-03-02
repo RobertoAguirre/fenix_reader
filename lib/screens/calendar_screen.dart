@@ -120,7 +120,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       ),
                     ),
                   ),
-                  const MoonPhaseIcon(),
+                  GestureDetector(
+                    onTap: () {
+                      final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+                      _showMessagesForDay(context, today, [], null);
+                    },
+                    child: const MoonPhaseIcon(),
+                  ),
                 ],
               ),
             ),
@@ -193,18 +199,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
             const SizedBox(height: 8),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                height: 260,
-                child: GridView.builder(
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 7,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1,
-                  ),
-                  itemCount: 42,
-                  itemBuilder: (context, index) {
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1,
+                ),
+                itemCount: 42,
+                itemBuilder: (context, index) {
                     final dayIndex = index - firstWeekday + 1;
                     if (dayIndex < 1 || dayIndex > daysInMonth) {
                       return const SizedBox.shrink();
@@ -240,7 +245,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   },
                 ),
               ),
-            ),
             const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -307,11 +311,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  List<_MessageEntry> _getFlattenedMessages() {
-    final list = <_MessageEntry>[];
-    for (final e in _messagesByDate.entries) {
-      for (final m in e.value) {
-        list.add(_MessageEntry(date: e.key, message: m));
+  /// Lista para "Mensajes diarios": sin búsqueda = solo hoy (mensajes + theta/clase); con búsqueda = todo el mes que coincida + ThetaFénix/clases que coincidan.
+  List<_CalendarListEntry> _getCalendarListEntries() {
+    final query = _messagesSearchController.text.toLowerCase().trim();
+    final today = DateTime.now();
+    final todayKey = DateTime(today.year, today.month, today.day);
+    final todayStr = '${todayKey.year}-${todayKey.month.toString().padLeft(2, '0')}-${todayKey.day.toString().padLeft(2, '0')}';
+    final list = <_CalendarListEntry>[];
+
+    if (query.isEmpty) {
+      for (final m in _messagesByDate[todayKey] ?? []) {
+        list.add(_CalendarListEntry(date: todayKey, message: m, event: null));
+      }
+      final theta = _thetaSessionsByDate[todayStr];
+      if (theta != null) {
+        list.add(_CalendarListEntry(date: todayKey, message: null, event: theta));
+      }
+    } else {
+      for (final e in _messagesByDate.entries) {
+        for (final m in e.value) {
+          final t = m.title.toLowerCase();
+          final b = m.message.toLowerCase();
+          if (t.contains(query) || b.contains(query)) {
+            list.add(_CalendarListEntry(date: e.key, message: m, event: null));
+          }
+        }
+      }
+      for (final e in _thetaSessionsByDate.entries) {
+        final title = (e.value['title'] as String? ?? '').toLowerCase();
+        if (title.contains(query)) {
+          final parts = e.key.split('-');
+          if (parts.length == 3) {
+            final y = int.tryParse(parts[0]);
+            final m = int.tryParse(parts[1]);
+            final d = int.tryParse(parts[2]);
+            if (y != null && m != null && d != null) {
+              list.add(_CalendarListEntry(date: DateTime(y, m, d), message: null, event: e.value));
+            }
+          }
+        }
       }
     }
     list.sort((a, b) => b.date.compareTo(a.date));
@@ -319,22 +357,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Widget _buildMessagesList() {
-    final entries = _getFlattenedMessages();
+    final entries = _getCalendarListEntries();
     final query = _messagesSearchController.text.toLowerCase().trim();
-    final filtered = query.isEmpty
-        ? entries
-        : entries.where((e) {
-            final t = e.message.title.toLowerCase();
-            final b = e.message.message.toLowerCase();
-            return t.contains(query) || b.contains(query);
-          }).toList();
 
-    if (filtered.isEmpty) {
+    if (entries.isEmpty) {
       return Center(
         child: Text(
           query.isEmpty
-              ? 'No hay mensajes este mes'
-              : 'Ningún mensaje coincide con la búsqueda',
+              ? 'No hay mensajes ni eventos hoy'
+              : 'Ningún mensaje o evento coincide con la búsqueda',
           style: AppTypography.ralewayRegular(
             fontSize: 14,
             color: AppColors.raizSagrada.withValues(alpha: 0.6),
@@ -345,17 +376,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: filtered.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final entry = filtered[index];
+        final entry = entries[index];
         final dateKey = entry.date;
         final messages = _messagesByDate[dateKey] ?? [];
         final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
-        return _MessageListTile(
+        final thetaSession = entry.event ?? _thetaSessionsByDate[dateStr];
+        if (entry.message != null) {
+          return _MessageListTile(
+            date: dateKey,
+            message: entry.message!,
+            monthName: _monthName(dateKey.month),
+            onTap: () => _showMessagesForDay(context, dateKey, messages, thetaSession),
+          );
+        }
+        final eventTitle = entry.event?['title']?.toString() ?? '';
+        return _EventListTile(
           date: dateKey,
-          message: entry.message,
           monthName: _monthName(dateKey.month),
-          onTap: () => _showMessagesForDay(context, dateKey, messages, _thetaSessionsByDate[dateStr]),
+          title: eventTitle,
+          onTap: () => _showMessagesForDay(context, dateKey, messages, thetaSession),
         );
       },
     );
@@ -411,9 +452,35 @@ class _CalendarScreenState extends State<CalendarScreen> {
               const SizedBox(height: 12),
               if (cacheItems.isNotEmpty)
                 ...cacheItems.map((item) {
-                  final label = typeLabels[item['type']!] ?? item['type']!;
+                  final type = item['type']!;
                   final title = item['title'] ?? '';
                   final at = item['at'] ?? '';
+                  if (type == 'clase') {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'CLASE FÉNIX',
+                            style: AppTypography.ralewayBold(
+                              fontSize: 16,
+                              color: AppColors.raizSagrada,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            title.isEmpty ? fechaTexto : '$title – $fechaTexto',
+                            style: AppTypography.ralewayRegular(
+                              fontSize: 14,
+                              color: AppColors.raizSagrada,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  final label = typeLabels[type] ?? type;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
@@ -479,7 +546,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'Sesión Theta Fénix',
+                  'THETAFÉNIX',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
@@ -487,7 +554,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatThetaSession(thetaSession),
+                  _formatThetaSessionSubtitle(thetaSession, dateKey),
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada,
@@ -502,13 +569,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   String _formatThetaSession(Map<String, dynamic> s) {
-    final title = s['title']?.toString() ?? 'Sesión Theta Fénix';
+    final title = s['title']?.toString() ?? '';
     final time = s['time']?.toString() ?? '';
     final duration = s['duration']?.toString() ?? '';
     final parts = <String>[title];
     if (time.isNotEmpty) parts.add(time);
     if (duration.isNotEmpty) parts.add(duration);
     return parts.join(' · ');
+  }
+
+  String _formatThetaSessionSubtitle(Map<String, dynamic> s, DateTime dateKey) {
+    final name = s['title']?.toString() ?? '';
+    final dateStr = '${dateKey.day} ${_monthName(dateKey.month)} ${dateKey.year}';
+    return name.isEmpty ? dateStr : '$name – $dateStr';
   }
 
   String _moonPhaseLabelFor(DateTime date) {
@@ -579,7 +652,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 if (messages.isNotEmpty) const SizedBox(height: 16),
                 Text(
-                  'Sesión Theta Fénix',
+                  'THETAFÉNIX',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
@@ -587,7 +660,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatThetaSession(thetaSession),
+                  _formatThetaSessionSubtitle(thetaSession, dateKey),
                   style: AppTypography.ralewayRegular(
                     fontSize: 14,
                     color: AppColors.raizSagrada,
@@ -606,6 +679,13 @@ class _MessageEntry {
   final DateTime date;
   final DailyMessage message;
   _MessageEntry({required this.date, required this.message});
+}
+
+class _CalendarListEntry {
+  final DateTime date;
+  final DailyMessage? message;
+  final Map<String, dynamic>? event;
+  _CalendarListEntry({required this.date, this.message, this.event});
 }
 
 class _MessageListTile extends StatelessWidget {
@@ -666,6 +746,60 @@ class _MessageListTile extends StatelessWidget {
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EventListTile extends StatelessWidget {
+  final DateTime date;
+  final String monthName;
+  final String title;
+  final VoidCallback onTap;
+
+  const _EventListTile({
+    required this.date,
+    required this.monthName,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: AppColors.raizSagrada.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${date.day} $monthName ${date.year}',
+              style: AppTypography.ralewayRegular(
+                fontSize: 12,
+                color: AppColors.raizSagrada.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (title.isNotEmpty)
+              Text(
+                title,
+                style: AppTypography.ralewayBold(
+                  fontSize: 14,
+                  color: AppColors.raizSagrada,
+                ),
               ),
           ],
         ),

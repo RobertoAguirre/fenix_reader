@@ -21,6 +21,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     final hasSession = await _authService.checkSession();
+    if (!hasSession) {
+      final reason = _authService.sessionInvalidReason;
+      if (reason != null) _error = reason;
+    }
 
     _isLoading = false;
     notifyListeners();

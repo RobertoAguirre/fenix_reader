@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -12,11 +13,14 @@ class AuthService {
   static const String _registerAppId = 'com.fenix.app.v1';
   static const String _tokenKey = 'jwt_token';
   static const String _userKey = 'user_data';
+  static const String _deviceIdKey = 'device_id';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   
   User? _currentUser;
   String? _token;
+  String? _lastSessionInvalidReason;
+  String? get sessionInvalidReason => _lastSessionInvalidReason;
 
   User? get currentUser => _currentUser;
   String? get token => _token;
@@ -55,6 +59,9 @@ class AuthService {
         await _storage.write(key: _userKey, value: jsonEncode(_currentUser!.toJson()));
 
         debugPrint('✅ AuthService: Datos guardados en storage');
+
+        final deviceId = await _getOrCreateDeviceId();
+        await _registerSession(deviceId);
 
         return AuthResult.success(_currentUser!);
       } else {
@@ -99,6 +106,7 @@ class AuthService {
   /// Verificar sesión guardada
   Future<bool> checkSession() async {
     try {
+      _lastSessionInvalidReason = null;
       _token = await _storage.read(key: _tokenKey);
       final userData = await _storage.read(key: _userKey);
 
@@ -108,13 +116,18 @@ class AuthService {
         _currentUser = User.fromJson(jsonDecode(userData));
         debugPrint('🔍 Usuario encontrado: ${_currentUser?.email}');
         
-        // Validar token con el servidor
-        debugPrint('🔍 Validando token con el servidor...');
-        final isValid = await _validateToken();
-        debugPrint('🔍 Token válido: $isValid');
-        
-        if (!isValid) {
+        final isValidToken = await _validateToken();
+        if (!isValidToken) {
           debugPrint('❌ Token inválido, limpiando sesión');
+          await logout();
+          return false;
+        }
+
+        final deviceId = await _getOrCreateDeviceId();
+        final sessionValid = await _validateSession(deviceId);
+        if (!sessionValid) {
+          debugPrint('❌ Sesión en otro dispositivo, limpiando');
+          _lastSessionInvalidReason = 'Tu cuenta está abierta en otro dispositivo. Inicia sesión de nuevo aquí.';
           await logout();
           return false;
         }
@@ -125,6 +138,52 @@ class AuthService {
       return false;
     } catch (e) {
       debugPrint('❌ Error verificando sesión: $e');
+      return false;
+    }
+  }
+
+  Future<String> _getOrCreateDeviceId() async {
+    String? id = await _storage.read(key: _deviceIdKey);
+    if (id != null && id.isNotEmpty) return id;
+    final bytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
+    id = base64UrlEncode(bytes).replaceAll('=', '');
+    await _storage.write(key: _deviceIdKey, value: id);
+    return id;
+  }
+
+  Future<void> _registerSession(String deviceId) async {
+    if (_token == null) return;
+    try {
+      final response = await http.post(
+        Uri.parse('$_fenixApiUrl/session/register'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'device_id': deviceId}),
+      );
+      if (response.statusCode != 200) debugPrint('⚠️ session/register: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('⚠️ session/register: $e');
+    }
+  }
+
+  Future<bool> _validateSession(String deviceId) async {
+    if (_token == null) return false;
+    try {
+      final response = await http.post(
+        Uri.parse('$_fenixApiUrl/session/validate'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'device_id': deviceId}),
+      );
+      if (response.statusCode != 200) return false;
+      final data = jsonDecode(response.body);
+      return data is Map && data['valid'] == true;
+    } catch (e) {
+      debugPrint('⚠️ session/validate: $e');
       return false;
     }
   }
