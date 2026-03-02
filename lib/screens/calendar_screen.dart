@@ -580,8 +580,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   String _formatThetaSessionSubtitle(Map<String, dynamic> s, DateTime dateKey) {
     final name = s['title']?.toString() ?? '';
+    final time = s['time']?.toString() ?? '';
+    final duration = s['duration']?.toString() ?? '';
     final dateStr = '${dateKey.day} ${_monthName(dateKey.month)} ${dateKey.year}';
-    return name.isEmpty ? dateStr : '$name – $dateStr';
+    final dateTimeStr = time.isEmpty ? dateStr : '$dateStr, $time';
+    final withDuration = duration.isEmpty ? dateTimeStr : '$dateTimeStr · $duration';
+    return name.isEmpty ? withDuration : '$name – $withDuration';
   }
 
   String _moonPhaseLabelFor(DateTime date) {

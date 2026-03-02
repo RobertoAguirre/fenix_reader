@@ -1327,7 +1327,25 @@ class ContentItem {
     } else if (title.contains('tapping') && downloadUrl == null) {
       debugPrint('   ❌ downloadUrl NO encontrado para tapping');
     }
-    
+
+    // Debug descripción: ítem "Bulimia" (solo para diagnosticar por qué no se ve descripción)
+    if (title.contains('bulimia')) {
+      debugPrint('🔍 [Bulimia] Campos del ítem: ${json.keys.toList()}');
+      const descKeys = [
+        'description', 'descripcion', 'excerpt', 'post_excerpt',
+        'short_description', 'summary', 'content', 'post_content',
+      ];
+      for (final k in descKeys) {
+        final v = json[k];
+        if (v != null) {
+          final s = (v is String) ? v : v.toString();
+          debugPrint('   $k: ${s.length > 80 ? "${s.substring(0, 80)}..." : s}');
+        }
+      }
+      final resolved = _descriptionFromJson(json);
+      debugPrint('   → descripción resuelta: ${resolved != null ? "${resolved.length} chars" : "null"}');
+    }
+
     return ContentItem(
       id: json['id'] as int? ??
           json['product_id'] as int? ??
@@ -1338,11 +1356,7 @@ class ContentItem {
           json['post_title'] as String? ??
           json['name'] as String? ??
           'Sin título',
-      description: json['description'] as String? ??
-          json['excerpt'] as String? ??
-          json['content'] as String? ??
-          json['post_content'] as String? ??
-          json['summary'] as String?,
+      description: _descriptionFromJson(json),
       category: json['category'] as String? ??
           (json['categories'] is List && (json['categories'] as List).isNotEmpty
               ? (json['categories'] as List)[0].toString()
@@ -1359,5 +1373,20 @@ class ContentItem {
     final u = json['url']?.toString() ?? '';
     final t = json['title']?.toString() ?? '';
     return (u + t).hashCode.abs();
+  }
+
+  static String? _descriptionFromJson(Map<String, dynamic> json) {
+    const keys = [
+      'description', 'descripcion', 'excerpt', 'post_excerpt',
+      'short_description', 'summary', 'content', 'post_content',
+    ];
+    for (final key in keys) {
+      final v = json[key];
+      if (v == null) continue;
+      final s = (v is String) ? v : v.toString();
+      final t = s.trim();
+      if (t.isNotEmpty) return t;
+    }
+    return null;
   }
 }

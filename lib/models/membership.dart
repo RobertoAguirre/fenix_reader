@@ -24,8 +24,9 @@ class Membership {
   factory Membership.fromJson(Map<String, dynamic> json) {
     final title = json['title'] as String? ?? json['name'] as String? ?? '';
     final tier = json['tier'] as String?;
+    final idVal = _parseInt(json['id']);
     return Membership(
-      id: json['id'] as int? ?? json['product_id'] as int? ?? 0,
+      id: idVal != 0 ? idVal : _parseInt(json['product_id']),
       title: title,
       slug: json['slug'] as String? ?? '',
       description: json['description'] as String?,
@@ -34,6 +35,13 @@ class Membership {
       permalink: json['permalink'] as String?,
       type: _typeFromTier(tier) ?? _parseType(title),
     );
+  }
+
+  static int _parseInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
   }
 
   static MembershipType? _typeFromTier(String? tier) {
