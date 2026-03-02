@@ -511,8 +511,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return parts.join(' · ');
   }
 
+  String _moonPhaseLabelFor(DateTime date) {
+    final phase = MoonPhaseService.getPhase(date);
+    final index = phase.index;
+    if (index == 0) return 'Luna nueva';
+    if (index == 4) return 'Luna llena';
+    if (index == 1 || index == 2 || index == 3) return 'Luna creciente';
+    return 'Luna menguante';
+  }
+
   void _showMessagesForDay(BuildContext context, DateTime dateKey, List<DailyMessage> messages, Map<String, dynamic>? thetaSession) {
-    if (messages.isEmpty && thetaSession == null) return;
+    final moonPhaseLabel = _moonPhaseLabelFor(dateKey);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.origen,
@@ -531,6 +540,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 style: AppTypography.ralewayBold(
                   fontSize: 14,
                   color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                moonPhaseLabel,
+                style: AppTypography.ralewayRegular(
+                  fontSize: 13,
+                  color: AppColors.raizSagrada,
                 ),
               ),
               const SizedBox(height: 12),

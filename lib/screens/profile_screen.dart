@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
@@ -111,8 +112,26 @@ class ProfileScreen extends StatelessWidget {
                 _MenuItem(
                   icon: Icons.email,
                   label: AppConstants.contactUs,
-                  onTap: () {
-                    // TODO: Abrir contacto
+                  onTap: () async {
+                    final uri = Uri(
+                      scheme: 'mailto',
+                      path: 'soporteappfenix@gmail.com',
+                      query: 'subject=Soporte%20y%20cancelaciones',
+                    );
+                    try {
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No se pudo abrir el correo')),
+                        );
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No se pudo abrir el correo')),
+                        );
+                      }
+                    }
                   },
                 ),
                 _MenuItem(
