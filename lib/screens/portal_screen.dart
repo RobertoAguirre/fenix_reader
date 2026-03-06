@@ -24,7 +24,6 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as html_dom;
 import 'package:flutter_screenshot_blocker/flutter_screenshot_blocker.dart';
-import '../services/activity_log_cache.dart';
 import '../services/favorites_service.dart';
 
 /// Pantalla de Portales/Inicio con tabs
@@ -124,14 +123,6 @@ class _PortalScreenState extends State<PortalScreen> {
     setState(() => _resourcesByGroup = map);
   }
 
-  String _promoVideoUrl(String group, String fallback) {
-    final list = _resourcesByGroup[group];
-    if (list != null && list.isNotEmpty && list.first.resourceUrl.isNotEmpty) {
-      return list.first.resourceUrl;
-    }
-    return fallback;
-  }
-
   String? _resourceVideoUrlForContentItem(String group, ContentItem item) {
     final list = _resourcesByGroup[group];
     if (list == null) return null;
@@ -182,14 +173,16 @@ class _PortalScreenState extends State<PortalScreen> {
       'paquetes',
     ];
 
-    // Remover frases que contengan palabras prohibidas
-    final sentences = cleaned.split(RegExp(r'[.!?]\s+'));
-    final allowedSentences = sentences.where((sentence) {
-      final lowerSentence = sentence.toLowerCase();
-      return !prohibitedWords.any((word) => lowerSentence.contains(word.toLowerCase()));
+    // Filtrar por líneas: quitar solo las líneas que contengan palabras prohibidas (no toda la descripción)
+    final lines = cleaned.split(RegExp(r'[\r\n]+'));
+    final allowedLines = lines.where((line) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) return false;
+      final lower = trimmed.toLowerCase();
+      return !prohibitedWords.any((word) => lower.contains(word.toLowerCase()));
     }).toList();
 
-    cleaned = allowedSentences.join('. ').trim();
+    cleaned = allowedLines.join(' ').trim();
     
     // Limpiar espacios múltiples
     cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -1475,14 +1468,13 @@ class _PortalScreenState extends State<PortalScreen> {
     final email = context.read<AuthProvider>().user?.email;
     if (email == null || email.isEmpty) return;
     final now = DateTime.now();
-    WordPressService().postActivityLog(
+    await WordPressService().postActivityLog(
       email: email,
       contentId: contentId,
       contentType: contentType,
       title: title,
       occurredAt: now,
     );
-    await addActivityItem(email: email, occurredAt: now, contentType: contentType, title: title);
   }
 
   /// Construir contenido de CONSULTA EXPRÉS
@@ -1555,8 +1547,18 @@ class _PortalScreenState extends State<PortalScreen> {
     }
   }
 
-  void _onItemTap(ContentItem item) {
-    if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
+  Future<void> _onItemTap(ContentItem item) async {
+    // Prioridad: 1) resource_url en user-purchases, 2) resources?group=..., 3) download_url (contenido anterior)
+    String? url = item.resourceUrl;
+    if (url == null || url.isEmpty) {
+      final group = item.type == ContentType.meditacion ? 'meditaciones' : 'hipnosis';
+      url = _resourceVideoUrlForContentItem(group, item);
+    }
+    if (url == null || url.isEmpty) {
+      url = item.downloadUrl;
+    }
+    if (url == null || url.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No hay URL de audio disponible para ${item.title}'),
@@ -1566,8 +1568,8 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
-    // Verificar si es una URL de audio
-    if (!AudioHelper.isAudioUrl(item.downloadUrl)) {
+    if (!AudioHelper.isAudioUrl(url) && !url.toLowerCase().contains('vimeo.com')) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('El contenido no tiene un formato de audio válido'),
@@ -1577,8 +1579,21 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
-    // Normalizar URL (convertir Google Drive si es necesario)
-    final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
+    // Si es Vimeo, resolver a URL de stream directa (just_audio no reproduce la página de Vimeo)
+    if (url.toLowerCase().contains('vimeo.com')) {
+      final idMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(url) ??
+          RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(url);
+      if (idMatch != null) {
+        final videoId = idMatch.group(1)!;
+        final directUrl = await VimeoService().getVimeoVideoUrl(videoId);
+        if (directUrl != null && directUrl.isNotEmpty && mounted) {
+          url = directUrl;
+        }
+      }
+    }
+
+    if (!mounted) return;
+    final audioUrl = AudioHelper.normalizeAudioUrl(url);
 
     _logActivity(
       item.type == ContentType.hipnosis ? 'hipnosis' : (item.type == ContentType.meditacion ? 'meditacion' : 'otro'),
@@ -1742,10 +1757,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional (dinámico desde fenix/v1/resources?group=hipnosis)
+          // Video de bienvenida de la sección (siempre la constante, no el catálogo)
           _PortalesVideoPlayer(
             key: ValueKey('hypnosis_$_selectedTab'),
-            videoUrl: _promoVideoUrl('hipnosis', AppConstants.hypnosisFenixVideoUrl),
+            videoUrl: AppConstants.hypnosisFenixVideoUrl,
           ),
           const SizedBox(height: 16),
           
@@ -2166,10 +2181,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional (dinámico desde fenix/v1/resources?group=meditaciones)
+          // Video de bienvenida de la sección (siempre la constante, no el catálogo)
           _PortalesVideoPlayer(
             key: ValueKey('meditations_$_selectedTab'),
-            videoUrl: _promoVideoUrl('meditaciones', AppConstants.meditationsFenixVideoUrl),
+            videoUrl: AppConstants.meditationsFenixVideoUrl,
           ),
           const SizedBox(height: 16),
           
@@ -2782,10 +2797,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional (dinámico desde fenix/v1/resources?group=tapping)
+          // Video de bienvenida de la sección (siempre la constante, no el catálogo)
           _PortalesVideoPlayer(
             key: ValueKey('tappings_$_selectedTab'),
-            videoUrl: _promoVideoUrl('tapping', AppConstants.tappingsVideoUrl),
+            videoUrl: AppConstants.tappingsVideoUrl,
           ),
           const SizedBox(height: 16),
           
@@ -3095,28 +3110,16 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Mostrar modal con video completo de tapping
+  /// Mostrar modal con video completo de tapping.
+  /// Prioridad: 1) resource_url (user-purchases), 2) resources?group=tapping, 3) downloadUrl.
   void _showTappingModal(ContentItem tapping) {
-    // URL: 1) downloadUrl (user-purchases), 2) fenix/v1/resources?group=tapping (related_product_id), 3) fallback por título
-    String? videoUrl = tapping.downloadUrl;
+    String? videoUrl = tapping.resourceUrl;
     if (videoUrl == null || videoUrl.isEmpty) {
       videoUrl = _resourceVideoUrlForContentItem('tapping', tapping);
     }
     if (videoUrl == null || videoUrl.isEmpty) {
-      final tappingVideoMap = {
-        'soltar el control': 'https://vimeo.com/1120509658',
-        'desbloquear la abundancia': 'https://vimeo.com/1120509396',
-        'ansiedad': 'https://vimeo.com/1120509009',
-      };
-      final titleLower = tapping.title.toLowerCase();
-      for (final entry in tappingVideoMap.entries) {
-        if (titleLower.contains(entry.key)) {
-          videoUrl = entry.value;
-          break;
-        }
-      }
+      videoUrl = tapping.downloadUrl;
     }
-    
     if (videoUrl == null || videoUrl.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -3236,10 +3239,10 @@ class _PortalScreenState extends State<PortalScreen> {
           ),
           const SizedBox(height: 12),
           
-          // Video promocional (dinámico desde fenix/v1/resources?group=clases)
+          // Video de bienvenida de la sección (siempre la constante, no el catálogo)
           _PortalesVideoPlayer(
             key: ValueKey('clases_$_selectedTab'),
-            videoUrl: _promoVideoUrl('clases', AppConstants.clasesVideoUrl),
+            videoUrl: AppConstants.clasesVideoUrl,
           ),
           const SizedBox(height: 16),
           
@@ -3538,49 +3541,15 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Mostrar modal con video completo de clase
-  /// URL: 1) downloadUrl, 2) fenix/v1/resources?group=clases (related_product_id), 3) fallback por título.
+  /// Mostrar modal con video completo de clase.
+  /// Prioridad: 1) resource_url (user-purchases), 2) resources?group=clases, 3) downloadUrl.
   void _showClaseModal(ContentItem clase) {
-    String? videoUrl = clase.downloadUrl;
+    String? videoUrl = clase.resourceUrl;
     if (videoUrl == null || videoUrl.isEmpty) {
       videoUrl = _resourceVideoUrlForContentItem('clases', clase);
     }
     if (videoUrl == null || videoUrl.isEmpty) {
-      const claseVideoMap = {
-        'abundancia 888': 'https://vimeo.com/1107909912',
-        'claridad y direccion': 'https://vimeo.com/1107909480',
-        'claridad y dirección': 'https://vimeo.com/1107909480',
-        'la procrastinación': 'https://vimeo.com/1097062328',
-        'la procrastinacion': 'https://vimeo.com/1097062328',
-        'procrastinación': 'https://vimeo.com/1097062328',
-        'procrastinacion': 'https://vimeo.com/1097062328',
-        'lenguajes del amor': 'https://vimeo.com/1097062442',
-        'lenguaje del amor': 'https://vimeo.com/1097062442',
-        'recordar para liberar': 'https://vimeo.com/1097062720',
-        'recordar para liberar 5d': 'https://vimeo.com/1097062720',
-        'valentía y propósito': 'https://vimeo.com/1097062561',
-        'valentia y proposito': 'https://vimeo.com/1097062561',
-        'sanación financiera': 'https://vimeo.com/1097062629',
-        'sanacion financiera': 'https://vimeo.com/1097062629',
-        'relaciones conscientes': 'https://vimeo.com/1097062823',
-        'el propósito': 'https://vimeo.com/1097062243',
-        'el proposito': 'https://vimeo.com/1097062243',
-        'el oráculo': 'https://vimeo.com/1097062071',
-        'el oraculo': 'https://vimeo.com/1097062071',
-        'activando poder creador': 'https://vimeo.com/1097061397',
-        'poder creador': 'https://vimeo.com/1097061397',
-        'cerrar ciclos': 'https://vimeo.com/1097061626',
-        'cerrando ciclos': 'https://vimeo.com/1097061626',
-        'creencias limitantes': 'https://vimeo.com/1097061727',
-        'el merecimiento': 'https://vimeo.com/1097061925',
-      };
-      final titleLower = clase.title.toLowerCase();
-      for (final entry in claseVideoMap.entries) {
-        if (titleLower.contains(entry.key)) {
-          videoUrl = entry.value;
-          break;
-        }
-      }
+      videoUrl = clase.downloadUrl;
     }
     if (videoUrl == null || videoUrl.isEmpty || videoUrl == 'https://vimeo.com/') {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -856,6 +856,51 @@ class WordPressService {
     }
   }
 
+  /// Ítems de actividad de un día (desde backend). GET fenix/v1/activity-log?email=x&date=YYYY-MM-DD.
+  /// Devuelve lista con type, title, at y resto de campos que envíe el backend (información completa).
+  Future<List<Map<String, String>>> getActivityItemsForDay(String email, String dateStr) async {
+    try {
+      final uri = Uri.parse('$baseUrl/activity-log?email=${Uri.encodeComponent(email)}&date=$dateStr');
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return [];
+      final body = jsonDecode(response.body);
+      final list = body is List
+          ? body
+          : (body is Map && body['items'] is List)
+              ? body['items'] as List
+              : (body is Map && body['data'] is List)
+                  ? body['data'] as List
+                  : (body is Map && body['activities'] is List)
+                      ? body['activities'] as List
+                      : (body is Map && body['logs'] is List)
+                          ? body['logs'] as List
+                          : <dynamic>[];
+      final out = <Map<String, String>>[];
+      for (final e in list) {
+        if (e is! Map<String, dynamic>) continue;
+        final type = (e['content_type'] ?? e['contentType'] ?? e['type'])?.toString() ?? '';
+        final title = (e['title'] ?? e['name'] ?? e['content_title'] ?? e['post_title'] ?? e['label'])?.toString().trim() ?? '';
+        final occurred = (e['occurred_at'] ?? e['occurredAt'] ?? e['at'])?.toString() ?? '';
+        String at = '';
+        if (occurred.isNotEmpty) {
+          final dt = DateTime.tryParse(occurred);
+          if (dt != null) at = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+          else if (occurred.length >= 5) at = occurred.substring(0, 5);
+        }
+        final item = <String, String>{'type': type, 'title': title, 'at': at};
+        final description = (e['description'] ?? e['excerpt'])?.toString().trim();
+        if (description != null && description.isNotEmpty) item['description'] = description;
+        final contentId = (e['content_id'] ?? e['contentId'])?.toString();
+        if (contentId != null && contentId.isNotEmpty) item['content_id'] = contentId;
+        out.add(item);
+      }
+      return out;
+    } catch (e) {
+      debugPrint('❌ getActivityItemsForDay: $e');
+      return [];
+    }
+  }
+
   /// Diccionarios con membresía. GET fenix/v1/dictionaries-membresia?email=...
   Future<List<Map<String, dynamic>>> getDictionariesMembresia(String email) async {
     try {
@@ -1204,6 +1249,8 @@ class ContentItem {
   final String? category;
   final String? image;
   final String? downloadUrl;
+  /// Cuando user-purchases tiene match con biblioteca: URL directa para reproducir (evita cruzar con resources?group=).
+  final String? resourceUrl;
   /// Tipo enviado por el backend (ej. "diccionario")
   final String? typeFromApi;
 
@@ -1215,6 +1262,7 @@ class ContentItem {
     this.category,
     this.image,
     this.downloadUrl,
+    this.resourceUrl,
     this.typeFromApi,
   });
 
@@ -1346,12 +1394,13 @@ class ContentItem {
       debugPrint('   → descripción resuelta: ${resolved != null ? "${resolved.length} chars" : "null"}');
     }
 
+    final idVal = _parseContentItemInt(json['id']);
+    final productIdVal = _parseContentItemInt(json['product_id']);
+    final woocommerceIdVal = _parseContentItemInt(json['woocommerce_id']);
+    final postIdVal = _parseContentItemInt(json['post_id']);
     return ContentItem(
-      id: json['id'] as int? ??
-          json['product_id'] as int? ??
-          json['post_id'] as int? ??
-          _hashCodeForDiccionario(json),
-      woocommerceId: json['woocommerce_id'] as int? ?? json['product_id'] as int?,
+      id: (idVal ?? productIdVal ?? postIdVal) ?? _hashCodeForDiccionario(json),
+      woocommerceId: woocommerceIdVal ?? productIdVal,
       title: json['title'] as String? ??
           json['post_title'] as String? ??
           json['name'] as String? ??
@@ -1365,8 +1414,19 @@ class ContentItem {
           json['image_url'] as String? ??
           json['thumbnail'] as String?,
       downloadUrl: downloadUrl,
+      resourceUrl: (json['resource_url'] as String?)?.trim().isNotEmpty == true
+          ? (json['resource_url'] as String).trim()
+          : null,
       typeFromApi: json['type'] as String?,
     );
+  }
+
+  static int? _parseContentItemInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v);
+    return null;
   }
 
   static int _hashCodeForDiccionario(Map<String, dynamic> json) {

@@ -4,7 +4,6 @@ import '../config/theme.dart';
 import '../models/daily_message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/calendar_refresh_provider.dart';
-import '../services/activity_log_cache.dart';
 import '../services/wordpress_service.dart';
 import '../services/moon_phase_service.dart';
 import '../widgets/moon_phase_icon.dart';
@@ -225,7 +224,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     final isToday = _focusedMonth.year == today.year &&
                         _focusedMonth.month == today.month &&
                         day == today.day;
-                    final moonPhase = MoonPhaseService.getPhase(dateKey);
+                    final moonPhase = MoonPhaseService.getPhaseForCalendarDay(dateKey);
                     return _DayCell(
                       day: day,
                       isToday: isToday,
@@ -410,6 +409,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
     return names[month - 1];
   }
 
+  /// Convierte ítem crudo del backend (content_type, title, description, occurred_at) al formato del modal.
+  List<Map<String, String>> _parseActivityItems(dynamic rawList) {
+    if (rawList is! List || rawList.isEmpty) return [];
+    final out = <Map<String, String>>[];
+    for (final e in rawList) {
+      if (e is! Map<String, dynamic>) continue;
+      final type = (e['content_type'] ?? e['contentType'] ?? e['type'])?.toString() ?? '';
+      final title = (e['title'] ?? e['name'] ?? e['content_title'] ?? e['post_title'] ?? e['label'])?.toString().trim() ?? '';
+      final occurred = (e['occurred_at'] ?? e['occurredAt'] ?? e['at'])?.toString() ?? '';
+      String at = '';
+      if (occurred.isNotEmpty) {
+        final dt = DateTime.tryParse(occurred);
+        if (dt != null) {
+          at = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        } else if (occurred.length >= 5) {
+          at = occurred.substring(0, 5);
+        }
+      }
+      final item = <String, String>{'type': type, 'title': title, 'at': at};
+      final description = (e['description'] ?? e['excerpt'])?.toString().trim();
+      if (description != null && description.isNotEmpty) item['description'] = description;
+      out.add(item);
+    }
+    return out;
+  }
+
   void _showActivityForDay(
     BuildContext context,
     DateTime dateKey,
@@ -425,8 +450,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
       'programa': 'Programa',
     };
     final dateStr = '${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}';
-    final email = context.read<AuthProvider>().user?.email;
-    final cacheItems = (email != null && email.isNotEmpty) ? await getActivityItems(email, dateStr) : <Map<String, String>>[];
+    // Prioridad: items que ya vienen en activityData (activity-calendar), si no GET activity-log?date=
+    List<Map<String, String>> items = _parseActivityItems(activityData['items']);
+    if (items.isEmpty) {
+      final email = context.read<AuthProvider>().user?.email;
+      if (email != null && email.isNotEmpty) {
+        items = await _wpService.getActivityItemsForDay(email, dateStr);
+      }
+    }
     final fechaTexto = '${dateKey.day} ${_monthName(dateKey.month)} ${dateKey.year}';
     if (!context.mounted) return;
     showModalBottomSheet<void>(
@@ -450,8 +481,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (cacheItems.isNotEmpty)
-                ...cacheItems.map((item) {
+              if (items.isNotEmpty)
+                ...items.map((item) {
                   final type = item['type']!;
                   final title = item['title'] ?? '';
                   final at = item['at'] ?? '';
@@ -481,14 +512,33 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     );
                   }
                   final label = typeLabels[type] ?? type;
+                  final description = item['description'] ?? '';
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      '$label: $title${at.isNotEmpty ? ', $at' : ''}',
-                      style: AppTypography.ralewayRegular(
-                        fontSize: 14,
-                        color: AppColors.raizSagrada,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '$label: $title${at.isNotEmpty ? ', $at' : ''}',
+                          style: AppTypography.ralewayRegular(
+                            fontSize: 14,
+                            color: AppColors.raizSagrada,
+                          ),
+                        ),
+                        if (description.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              description,
+                              style: AppTypography.ralewayRegular(
+                                fontSize: 12,
+                                color: AppColors.raizSagrada.withValues(alpha: 0.7),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 })
@@ -589,7 +639,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   String _moonPhaseLabelFor(DateTime date) {
-    final phase = MoonPhaseService.getPhase(date);
+    final phase = MoonPhaseService.getPhaseForCalendarDay(date);
     final index = phase.index;
     if (index == 0) return 'Luna nueva';
     if (index == 4) return 'Luna llena';

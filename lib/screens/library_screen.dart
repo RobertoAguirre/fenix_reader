@@ -5,7 +5,6 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/content_provider.dart';
-import '../services/activity_log_cache.dart';
 import '../services/wordpress_service.dart';
 import '../services/favorites_service.dart';
 import '../widgets/audio_player_modal.dart';
@@ -251,14 +250,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 if (email != null && email.isNotEmpty) {
                   final ct = item.type == ContentType.hipnosis ? 'hipnosis' : (item.type == ContentType.meditacion ? 'meditacion' : 'otro');
                   final now = DateTime.now();
-                  WordPressService().postActivityLog(
+                  await WordPressService().postActivityLog(
                     email: email,
                     contentId: item.id,
                     contentType: ct,
                     title: item.title,
                     occurredAt: now,
                   );
-                  await addActivityItem(email: email, occurredAt: now, contentType: ct, title: item.title);
                 }
 
                 showAudioPlayer(

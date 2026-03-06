@@ -9,6 +9,12 @@ class MoonPhaseService {
   /// Mes sinódico en días (lunación media).
   static const double _synodicMonth = 29.530588853;
 
+  /// Fase lunar para un día del calendario (usa mediodía local para evitar desfase por zona horaria).
+  static MoonPhaseData getPhaseForCalendarDay(DateTime localDate) {
+    final noon = DateTime(localDate.year, localDate.month, localDate.day, 12, 0);
+    return getPhase(noon);
+  }
+
   /// Fase lunar para la fecha y hora dadas (usa hora local del dispositivo).
   static MoonPhaseData getPhase(DateTime d) {
     final utc = d.toUtc();
