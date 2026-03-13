@@ -26,6 +26,18 @@ import 'package:html/dom.dart' as html_dom;
 import 'package:flutter_screenshot_blocker/flutter_screenshot_blocker.dart';
 import '../services/favorites_service.dart';
 
+/// Extrae URL de portada desde string o objeto (ej. { "url": "...", "source_url": "..." }).
+String _coverUrlFromValue(dynamic v) {
+  if (v == null) return '';
+  if (v is String) return v.trim();
+  if (v is Map) {
+    final url = v['url'] ?? v['source_url'] ?? v['link'];
+    if (url is String) return url.trim();
+    if (url != null) return url.toString().trim();
+  }
+  return '';
+}
+
 /// Pantalla de Portales/Inicio con tabs
 class PortalScreen extends StatefulWidget {
   const PortalScreen({super.key});
@@ -70,6 +82,8 @@ class _PortalScreenState extends State<PortalScreen> {
   List<Map<String, dynamic>> _dictionariesMembresia = [];
   bool _dictionariesLoading = false;
   bool _dictionariesLoaded = false;
+  /// Portadas resueltas por product_id cuando el API no envía imagen
+  final Map<String, String> _resolvedDocumentCovers = {};
   static final WordPressService _wpService = WordPressService();
 
   /// Recursos Vimeo por grupo (Biblioteca ACF). Cruce con user-purchases por related_product_id.
@@ -1436,7 +1450,7 @@ class _PortalScreenState extends State<PortalScreen> {
           return;
         }
         if (hasVideo) {
-          final idMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(vimeoCode!) ??
+          final idMatch = RegExp(r'vimeo\.com/(?:video/)?(\d+)').firstMatch(vimeoCode!) ??
               RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(vimeoCode!);
           if (idMatch != null) {
             final videoId = idMatch.group(1)!;
@@ -1444,11 +1458,12 @@ class _PortalScreenState extends State<PortalScreen> {
             final directUrl = await vimeoService.getVimeoVideoUrl(videoId);
             if (directUrl != null && directUrl.isNotEmpty && mounted) {
               _logActivity('programa', 0, lessonTitle);
-              showVideoPlayer(context: context, videoUrl: directUrl, title: lessonTitle);
+              // Solo en programas: Vimeo se reproduce como audio (background como resto de audios).
+              showAudioPlayer(context: context, audioUrl: directUrl, title: lessonTitle);
             } else if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('No se pudo cargar el video'),
+                  content: Text('No se pudo cargar el contenido'),
                   backgroundColor: AppColors.error,
                 ),
               );
@@ -1581,7 +1596,7 @@ class _PortalScreenState extends State<PortalScreen> {
 
     // Si es Vimeo, resolver a URL de stream directa (just_audio no reproduce la página de Vimeo)
     if (url.toLowerCase().contains('vimeo.com')) {
-      final idMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(url) ??
+      final idMatch = RegExp(r'vimeo\.com/(?:video/)?(\d+)').firstMatch(url) ??
           RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(url);
       if (idMatch != null) {
         final videoId = idMatch.group(1)!;
@@ -1667,21 +1682,38 @@ class _PortalScreenState extends State<PortalScreen> {
     final raw = await _wpService.getDictionariesMembresia(email);
     if (!mounted) return;
     final list = <Map<String, dynamic>>[];
+    const coverKeys = [
+      'coverUrl', 'cover_url', 'portada', 'image', 'image_url', 'thumbnail', 'thumb',
+      'featured_image', 'featured_image_url', 'picture', 'poster', 'picture_url', 'img', 'cover',
+    ];
     for (final e in raw) {
       final url = (e['url'] ?? e['download_url'] ?? e['link'] ?? e['pdf_url'] ?? '').toString();
       if (url.isEmpty) continue;
-      String coverUrl = (e['coverUrl'] ?? e['cover_url'] ?? e['image'] ?? e['image_url'] ?? e['thumbnail'] ?? e['thumb'] ?? e['featured_image'] ?? e['picture'] ?? e['poster'] ?? '').toString();
+      String coverUrl = '';
+      for (final k in coverKeys) {
+        if (e[k] != null) {
+          coverUrl = _coverUrlFromValue(e[k]);
+          if (coverUrl.isNotEmpty) break;
+        }
+      }
       if (coverUrl.isEmpty) {
         final id = e['id'];
         final mediaId = id is int ? id : (id != null ? int.tryParse(id.toString()) : null);
         if (mediaId != null) coverUrl = (await _wpService.getMediaThumbnailUrl(mediaId)) ?? '';
       }
+      if (coverUrl.isEmpty) {
+        final pid = e['product_id'] ?? e['woocommerce_id'];
+        final productId = pid is int ? pid : (pid != null ? int.tryParse(pid.toString()) : null);
+        if (productId != null) coverUrl = (await _wpService.getProductImageUrl(productId)) ?? '';
+      }
+      final productId = e['product_id'] ?? e['woocommerce_id'];
       list.add(<String, dynamic>{
         'id': (e['id'] ?? '').toString(),
         'titulo': (e['titulo'] ?? e['title'] ?? '').toString(),
         'descripcion': (e['descripcion'] ?? e['description'] ?? '').toString(),
         'url': url,
         'coverUrl': coverUrl,
+        'productId': productId is int ? productId : (productId != null ? int.tryParse(productId.toString()) : null),
       });
     }
     setState(() {
@@ -1689,6 +1721,26 @@ class _PortalScreenState extends State<PortalScreen> {
       _dictionariesLoading = false;
       _dictionariesLoaded = true;
     });
+  }
+
+  Future<void> _resolveMissingDocumentCovers(List<Map<String, dynamic>> docs) async {
+    if (!mounted) return;
+    final toResolve = <int>{};
+    for (final doc in docs) {
+      final coverUrl = (doc['coverUrl'] as String?).toString().trim();
+      if (coverUrl.isNotEmpty) continue;
+      final productId = doc['productId'];
+      final pid = productId is int ? productId : (productId != null ? int.tryParse(productId.toString()) : null);
+      if (pid != null && !_resolvedDocumentCovers.containsKey('pid:$pid')) toResolve.add(pid);
+    }
+    for (final pid in toResolve) {
+      final url = await _wpService.getProductImageUrl(pid);
+      if (!mounted) return;
+      if (url != null && url.isNotEmpty) {
+        _resolvedDocumentCovers['pid:$pid'] = url;
+        setState(() {});
+      }
+    }
   }
 
   /// Buscador para diccionarios/documentos (mismo estilo que Hipnosis)
@@ -2472,7 +2524,32 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Lista de documentos: diccionarios de membership_content (user-purchases) + dictionaries-membresia
+  /// Diccionarios gratuitos (siempre visibles para todos los usuarios).
+  static const _diccionariosGratuitos = <Map<String, String>>[
+    {
+      'id': 'gratuito_1',
+      'titulo': 'Mensajes del Universo Fenix',
+      'descripcion': 'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
+      'url': 'https://docs.google.com/document/d/1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk/export?format=html',
+      'localCover': 'assets/images/mensajes.png',
+    },
+    {
+      'id': 'gratuito_2',
+      'titulo': 'Astrologia basica y energia lunar Fenix',
+      'descripcion': 'Descubre la energía de la luna y fases astrológicas para usar a tu favor',
+      'url': 'https://docs.google.com/document/d/17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do/export?format=html',
+      'localCover': 'assets/images/energia.png',
+    },
+    {
+      'id': 'gratuito_3',
+      'titulo': 'Mensajes Emociones Fenix',
+      'descripcion': 'Descubre el mensaje detrás de tus emociones y recuerda quién eres',
+      'url': 'https://docs.google.com/document/d/1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60/export?format=html',
+      'localCover': 'assets/images/emociones.png',
+    },
+  ];
+
+  /// Lista de documentos: gratuitos (siempre) + membership_content + dictionaries-membresia
   Widget _buildDocumentsList() {
     if (_dictionariesLoading) {
       return const Padding(
@@ -2480,8 +2557,23 @@ class _PortalScreenState extends State<PortalScreen> {
         child: Center(child: CircularProgressIndicator(color: AppColors.raizSagrada)),
       );
     }
-    final fromMembresia = _dictionariesMembresia;
-    final seenUrls = fromMembresia.map((d) => (d['url'] as String? ?? '').toString()).where((u) => u.isNotEmpty).toSet();
+
+    // 1. Gratuitos siempre presentes
+    final seenUrls = <String>{};
+    final gratuitos = _diccionariosGratuitos.map((g) {
+      seenUrls.add(g['url']!);
+      return <String, dynamic>{...g};
+    }).toList();
+
+    // 2. Diccionarios de membresía (API)
+    final fromMembresia = _dictionariesMembresia
+        .where((d) => !seenUrls.contains((d['url'] as String? ?? '')))
+        .toList();
+    for (final d in fromMembresia) {
+      seenUrls.add((d['url'] as String? ?? ''));
+    }
+
+    // 3. Diccionarios de ContentProvider (user-purchases / membership_content)
     final fromContent = context.read<ContentProvider>().all
         .where((item) => item.type == ContentType.diccionario)
         .map((item) => <String, dynamic>{
@@ -2489,11 +2581,14 @@ class _PortalScreenState extends State<PortalScreen> {
               'titulo': item.title,
               'descripcion': item.description ?? '',
               'url': item.downloadUrl ?? '',
-              'coverUrl': '',
+              'coverUrl': item.image ?? '',
+              'productId': item.woocommerceId,
             })
-        .where((d) => (d['url'] as String?).toString().isNotEmpty && !seenUrls.contains((d['url'] as String?).toString()))
+        .where((d) => (d['url'] as String? ?? '').isNotEmpty && !seenUrls.contains(d['url'] as String?))
         .toList();
-    final baseList = <Map<String, dynamic>>[...fromMembresia, ...fromContent];
+
+    final baseList = <Map<String, dynamic>>[...gratuitos, ...fromMembresia, ...fromContent];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resolveMissingDocumentCovers(baseList));
     final searchQuery = _documentsSearchController.text.toLowerCase().trim();
     final filtered = searchQuery.isEmpty
         ? baseList
@@ -2529,10 +2624,37 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Portada o icono del documento (si el backend envía coverUrl se usa; si no, placeholder con inicial)
+  /// Portada del documento: localCover (asset) → coverUrl (red) → placeholder.
   Widget _documentCover(Map<String, dynamic> document) {
-    final coverUrl = document['coverUrl'] as String?;
     const size = 48.0;
+
+    // 1. Asset local (diccionarios gratuitos)
+    final localCover = document['localCover'] as String?;
+    if (localCover != null && localCover.isNotEmpty) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.asset(localCover, fit: BoxFit.cover),
+        ),
+      );
+    }
+
+    // 2. URL de red (backend / resolved)
+    String? coverUrl = (document['coverUrl'] as String?)?.trim();
+    if (coverUrl == null || coverUrl.isEmpty || coverUrl == 'null') {
+      final urlKey = (document['url'] as String?)?.toString();
+      coverUrl = (urlKey != null && urlKey.isNotEmpty) ? _resolvedDocumentCovers[urlKey] : null;
+    }
+    if (coverUrl == null || coverUrl.isEmpty) {
+      final productId = document['productId'];
+      final pid = productId is int ? productId : (productId != null ? int.tryParse(productId.toString()) : null);
+      if (pid != null) coverUrl = _resolvedDocumentCovers['pid:$pid'];
+    }
+    if (coverUrl != null && coverUrl.isNotEmpty && coverUrl.startsWith('/')) {
+      coverUrl = '${WordPressService.origin}$coverUrl';
+    }
     if (coverUrl != null && coverUrl.isNotEmpty) {
       return SizedBox(
         width: size,
@@ -2548,6 +2670,7 @@ class _PortalScreenState extends State<PortalScreen> {
         ),
       );
     }
+
     return _documentCoverPlaceholder(document, size);
   }
 
@@ -3111,8 +3234,8 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   /// Mostrar modal con video completo de tapping.
-  /// Prioridad: 1) resource_url (user-purchases), 2) resources?group=tapping, 3) downloadUrl.
-  void _showTappingModal(ContentItem tapping) {
+  /// Prioridad: 1) resource_url, 2) resources en memoria, 3) downloadUrl, 4) resources?group=tapping&product_id=.
+  Future<void> _showTappingModal(ContentItem tapping) async {
     String? videoUrl = tapping.resourceUrl;
     if (videoUrl == null || videoUrl.isEmpty) {
       videoUrl = _resourceVideoUrlForContentItem('tapping', tapping);
@@ -3121,6 +3244,19 @@ class _PortalScreenState extends State<PortalScreen> {
       videoUrl = tapping.downloadUrl;
     }
     if (videoUrl == null || videoUrl.isEmpty) {
+      final pid = tapping.woocommerceId ?? tapping.id;
+      if (pid != 0) {
+        final list = await _wpService.getResources(group: 'tapping', productId: pid);
+        for (final r in list) {
+          if (r.resourceUrl.isNotEmpty) {
+            videoUrl = r.resourceUrl;
+            break;
+          }
+        }
+      }
+    }
+    if (videoUrl == null || videoUrl.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No hay video disponible para ${tapping.title}'),
@@ -3130,6 +3266,7 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
+    if (!mounted) return;
     _logActivity('tapping', tapping.id, tapping.title);
     showModalBottomSheet(
       context: context,
@@ -3542,8 +3679,8 @@ class _PortalScreenState extends State<PortalScreen> {
   }
 
   /// Mostrar modal con video completo de clase.
-  /// Prioridad: 1) resource_url (user-purchases), 2) resources?group=clases, 3) downloadUrl.
-  void _showClaseModal(ContentItem clase) {
+  /// Prioridad: 1) resource_url, 2) resources en memoria, 3) downloadUrl, 4) resources?group=clases&product_id=.
+  Future<void> _showClaseModal(ContentItem clase) async {
     String? videoUrl = clase.resourceUrl;
     if (videoUrl == null || videoUrl.isEmpty) {
       videoUrl = _resourceVideoUrlForContentItem('clases', clase);
@@ -3552,6 +3689,19 @@ class _PortalScreenState extends State<PortalScreen> {
       videoUrl = clase.downloadUrl;
     }
     if (videoUrl == null || videoUrl.isEmpty || videoUrl == 'https://vimeo.com/') {
+      final pid = clase.woocommerceId ?? clase.id;
+      if (pid != 0) {
+        final list = await _wpService.getResources(group: 'clases', productId: pid);
+        for (final r in list) {
+          if (r.resourceUrl.isNotEmpty) {
+            videoUrl = r.resourceUrl;
+            break;
+          }
+        }
+      }
+    }
+    if (videoUrl == null || videoUrl.isEmpty || videoUrl == 'https://vimeo.com/') {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('No hay video disponible para ${clase.title}'),
@@ -3561,6 +3711,7 @@ class _PortalScreenState extends State<PortalScreen> {
       return;
     }
 
+    if (!mounted) return;
     _logActivity('clase', clase.id, clase.title);
     showModalBottomSheet(
       context: context,
@@ -3664,9 +3815,10 @@ class _TappingVideoPlayerState extends State<_TappingVideoPlayer> {
 
   Future<void> _loadVideo() async {
     try {
-      // Verificar si es URL de Vimeo (vimeo.com/ID o player.vimeo.com/video/ID)
-      final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
-      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(widget.videoUrl);
+      // Vimeo: vimeo.com/ID, vimeo.com/video/ID, player.vimeo.com/video/ID (con o sin query)
+      final url = widget.videoUrl.trim();
+      final vimeoMatch = RegExp(r'vimeo\.com/(?:video/)?(\d+)').firstMatch(url);
+      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(url);
       final videoId = vimeoMatch?.group(1) ?? playerMatch?.group(1);
       if (videoId != null) {
         // Es Vimeo - usar VimeoService para obtener URL directa
@@ -4010,9 +4162,10 @@ class _PortalesVideoPlayerState extends State<_PortalesVideoPlayer> {
 
   Future<void> _loadVideo() async {
     try {
-      // Extraer ID de Vimeo (vimeo.com/ID o player.vimeo.com/video/ID)
-      final vimeoMatch = RegExp(r'vimeo\.com/(\d+)').firstMatch(widget.videoUrl);
-      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(widget.videoUrl);
+      // Vimeo: vimeo.com/ID, vimeo.com/video/ID, player... (con o sin query)
+      final url = widget.videoUrl.trim();
+      final vimeoMatch = RegExp(r'vimeo\.com/(?:video/)?(\d+)').firstMatch(url);
+      final playerMatch = RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(url);
       final videoId = vimeoMatch?.group(1) ?? playerMatch?.group(1);
       if (videoId == null) {
         setState(() {

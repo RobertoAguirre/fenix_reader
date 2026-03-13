@@ -8,6 +8,8 @@ import '../models/daily_message.dart';
 class WordPressService {
   static const String baseUrl = 'https://wendystaufert.com/wp-json/fenix/v1';
   static const String wpBaseUrl = 'https://wendystaufert.com/wp-json/wp/v2';
+  /// Origen del sitio (para convertir URLs relativas de portadas en absolutas).
+  static const String origin = 'https://wendystaufert.com';
   
   // Timeouts
   static const Duration normalTimeout = Duration(seconds: 10);
@@ -76,9 +78,10 @@ class WordPressService {
       }
     }
 
-    // Verificar rate limiting
-    final shouldThrottle = await _cacheService.checkRateLimit('purchases');
-    if (shouldThrottle && !forceRefresh) {
+    // Rate limit solo sin forceRefresh (compra nueva → siempre pegar al API)
+    final shouldThrottle =
+        forceRefresh ? false : await _cacheService.checkRateLimit('purchases');
+    if (shouldThrottle) {
       final cached = await _cacheService.getCachedPurchases(email);
       if (cached != null) {
         debugPrint('⚠️ Rate limit: usando caché');
@@ -150,6 +153,36 @@ class WordPressService {
               final pid = item['product_id'] as int? ?? item['id'] as int? ?? 0;
               if (seenIds.add(pid)) mergedData.add(item);
             }
+          }
+        }
+
+        // Formato nuevo: download_urls vacío pero resource_url (Vimeo) en el producto.
+        // Si compras llegó primero sin resource_url, el merge anterior descartaba la copia de membresía.
+        // Enriquecer in-place: copiar resource_url desde membresía al ítem ya en mergedData con mismo product_id.
+        int productIdFromMap(Map<String, dynamic> m) {
+          final p = m['product_id'] ?? m['id'];
+          if (p is int) return p;
+          if (p is num) return p.toInt();
+          return int.tryParse(p?.toString() ?? '') ?? 0;
+        }
+
+        for (final item in membershipData) {
+          if (item is! Map<String, dynamic>) continue;
+          if ((item['type'] as String? ?? '').toLowerCase() == 'diccionario') continue;
+          final ru = item['resource_url']?.toString().trim();
+          if (ru == null || ru.isEmpty) continue;
+          final pid = productIdFromMap(item);
+          if (pid == 0) continue;
+          for (final existing in mergedData) {
+            if (existing is! Map<String, dynamic>) continue;
+            final ep = productIdFromMap(existing);
+            if (ep != pid) continue;
+            final existingRu = existing['resource_url']?.toString().trim();
+            if (existingRu == null || existingRu.isEmpty) {
+              existing['resource_url'] = ru;
+              debugPrint('🔗 Enriquecido resource_url para product_id=$pid (formato nuevo Vimeo)');
+            }
+            break;
           }
         }
         
@@ -916,6 +949,24 @@ class WordPressService {
     }
   }
 
+  /// Imagen de producto (portada). GET fenix/v1/product-image?product_id=...&size=medium
+  Future<String?> getProductImageUrl(int productId) async {
+    try {
+      final uri = Uri.parse('$baseUrl/product-image?product_id=$productId&size=medium');
+      final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return null;
+      final url = body['image_url']?.toString().trim() ??
+          body['url']?.toString().trim() ??
+          body['src']?.toString().trim() ??
+          body['link']?.toString().trim();
+      return url != null && url.isNotEmpty ? url : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Portada de un attachment (solo lectura wp/v2/media). No afecta dictionaries-membresia.
   Future<String?> getMediaThumbnailUrl(int mediaId) async {
     try {
@@ -1022,8 +1073,21 @@ class WordPressService {
       final out = <VimeoResource>[];
       for (final e in list) {
         if (e is Map<String, dynamic>) {
-          final url = e['resource_url']?.toString();
+          String? url = e['resource_url']?.toString().trim();
+          if (url == null || url.isEmpty) {
+            for (final key in ['url', 'vimeo_url', 'link', 'video_url']) {
+              final s = e[key]?.toString().trim();
+              if (s != null && s.isNotEmpty && s != 'https://vimeo.com/') {
+                url = s;
+                break;
+              }
+            }
+          }
           if (url == null || url.isEmpty) continue;
+          if (url.contains('vimeo.com/manage/videos/')) {
+            final m = RegExp(r'vimeo\.com/manage/videos/(\d+)').firstMatch(url);
+            if (m != null) url = 'https://vimeo.com/${m.group(1)}';
+          }
           final rp = e['related_product_id'];
           final relatedProductId = rp is int ? rp : (rp is num ? rp.toInt() : int.tryParse(rp?.toString() ?? ''));
           final rid = e['resource_id'];
@@ -1288,6 +1352,14 @@ class ContentItem {
     return ContentType.hipnosis;
   }
 
+  /// resource_url puede venir como String u otro tipo desde el endpoint (Vimeo formato nuevo).
+  static String? _resourceUrlFromJson(dynamic v) {
+    if (v == null) return null;
+    final s = v is String ? v : v.toString();
+    final t = s.trim();
+    return t.isNotEmpty ? t : null;
+  }
+
   factory ContentItem.fromJson(Map<String, dynamic> json) {
     // Buscar URL de audio en múltiples campos posibles (como en FenixRn)
     String? downloadUrl;
@@ -1397,10 +1469,11 @@ class ContentItem {
     final idVal = _parseContentItemInt(json['id']);
     final productIdVal = _parseContentItemInt(json['product_id']);
     final woocommerceIdVal = _parseContentItemInt(json['woocommerce_id']);
+    final relatedProductIdVal = _parseContentItemInt(json['related_product_id']);
     final postIdVal = _parseContentItemInt(json['post_id']);
     return ContentItem(
       id: (idVal ?? productIdVal ?? postIdVal) ?? _hashCodeForDiccionario(json),
-      woocommerceId: woocommerceIdVal ?? productIdVal,
+      woocommerceId: woocommerceIdVal ?? productIdVal ?? relatedProductIdVal,
       title: json['title'] as String? ??
           json['post_title'] as String? ??
           json['name'] as String? ??
@@ -1410,13 +1483,10 @@ class ContentItem {
           (json['categories'] is List && (json['categories'] as List).isNotEmpty
               ? (json['categories'] as List)[0].toString()
               : null),
-      image: json['image'] as String? ??
-          json['image_url'] as String? ??
-          json['thumbnail'] as String?,
+      image: _imageFromJson(json),
       downloadUrl: downloadUrl,
-      resourceUrl: (json['resource_url'] as String?)?.trim().isNotEmpty == true
-          ? (json['resource_url'] as String).trim()
-          : null,
+      // Formato nuevo: solo resource_url (player.vimeo.com/...) sin download_urls
+      resourceUrl: _resourceUrlFromJson(json['resource_url']),
       typeFromApi: json['type'] as String?,
     );
   }
@@ -1446,6 +1516,27 @@ class ContentItem {
       final s = (v is String) ? v : v.toString();
       final t = s.trim();
       if (t.isNotEmpty) return t;
+    }
+    return null;
+  }
+
+  /// URL de portada: string o objeto con url/source_url (p. ej. API WordPress/WooCommerce).
+  static String? _imageFromJson(Map<String, dynamic> json) {
+    const keys = [
+      'image', 'image_url', 'thumbnail', 'cover_url', 'portada', 'coverUrl',
+      'featured_image', 'featured_image_url', 'picture', 'poster', 'picture_url', 'thumb',
+    ];
+    for (final key in keys) {
+      final v = json[key];
+      if (v == null) continue;
+      if (v is String) {
+        final t = v.trim();
+        if (t.isNotEmpty) return t;
+      }
+      if (v is Map) {
+        final url = v['url'] ?? v['source_url'] ?? v['link'];
+        if (url is String && url.trim().isNotEmpty) return url.trim();
+      }
     }
     return null;
   }
