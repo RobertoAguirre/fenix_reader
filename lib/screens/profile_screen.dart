@@ -116,7 +116,7 @@ class ProfileScreen extends StatelessWidget {
                     final uri = Uri(
                       scheme: 'mailto',
                       path: 'soporteappfenix@gmail.com',
-                      query: 'subject=Soporte%20y%20cancelaciones',
+                      query: 'subject=Soporte',
                     );
                     try {
                       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);

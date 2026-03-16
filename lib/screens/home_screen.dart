@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../config/constants.dart';
 import '../widgets/fenix_logo.dart';
 import '../widgets/fenix_bottom_nav.dart';
 import '../providers/auth_provider.dart';
+import '../providers/content_provider.dart';
 import '../providers/calendar_refresh_provider.dart';
 import 'calendar_screen.dart';
 import 'portal_screen.dart';
@@ -18,15 +20,17 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  DateTime? _lastPurchasesSync;
 
   final List<Widget> _screens = [];
   
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _screens.addAll([
       const PortalScreen(),
       const CalendarScreen(),
@@ -34,6 +38,30 @@ class _HomeScreenState extends State<HomeScreen> {
         onNavigateToIndex: (index) => setState(() => _currentIndex = index),
       ),
     ]);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final email = context.read<AuthProvider>().user?.email;
+    if (email == null) return;
+    // Tras comprar en navegador y volver: refrescar sin caché (máx. cada 20s para no spamear)
+    final now = DateTime.now();
+    if (_lastPurchasesSync != null &&
+        now.difference(_lastPurchasesSync!) < const Duration(seconds: 20)) {
+      return;
+    }
+    _lastPurchasesSync = now;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ContentProvider>().syncPurchasesFromServer(email);
+    });
   }
 
   @override

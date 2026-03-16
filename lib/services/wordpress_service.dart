@@ -1338,6 +1338,20 @@ class ContentItem {
     final lowerTitle = title.toLowerCase();
     final lowerCategory = (category ?? '').toLowerCase();
 
+    if (apiType == 'webinar' ||
+        lowerTitle.contains('clase') ||
+        lowerTitle.contains('clases') ||
+        lowerCategory.contains('clase') ||
+        lowerCategory.contains('clases')) {
+      return ContentType.otro;
+    }
+    if (lowerTitle.contains('tapping') ||
+        lowerTitle.contains('tappings') ||
+        lowerCategory.contains('tapping') ||
+        lowerCategory.contains('tappings')) {
+      return ContentType.otro;
+    }
+
     if (lowerTitle.contains('meditación') ||
         lowerTitle.contains('meditacion') ||
         lowerCategory.contains('meditación') ||
@@ -1520,7 +1534,7 @@ class ContentItem {
     return null;
   }
 
-  /// URL de portada: string o objeto con url/source_url (p. ej. API WordPress/WooCommerce).
+  /// Portada: user-purchases envía el campo `image` con la URL. Prioridad: image, image_url, etc.
   static String? _imageFromJson(Map<String, dynamic> json) {
     const keys = [
       'image', 'image_url', 'thumbnail', 'cover_url', 'portada', 'coverUrl',

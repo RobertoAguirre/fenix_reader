@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/wordpress_service.dart';
+import '../services/cache_service.dart';
 
 /// Provider de contenido del usuario
 class ContentProvider extends ChangeNotifier {
@@ -41,6 +42,13 @@ class ContentProvider extends ChangeNotifier {
 
   bool get hasContent => _content?.isNotEmpty ?? false;
   bool get hasPublicContent => _publicMeditaciones.isNotEmpty || _publicHipnosis.isNotEmpty;
+
+  /// Sincronizar compras/membresía con el servidor (sin caché). Tras comprar en web o nueva membresía.
+  Future<void> syncPurchasesFromServer(String email) async {
+    await CacheService().clearPurchasesCache(email);
+    await loadUserContent(email, forceRefresh: true);
+    await loadUserPrograms(email, forceRefresh: true);
+  }
 
   /// Cargar contenido del usuario
   Future<void> loadUserContent(String email, {bool forceRefresh = false}) async {

@@ -2524,32 +2524,7 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Diccionarios gratuitos (siempre visibles para todos los usuarios).
-  static const _diccionariosGratuitos = <Map<String, String>>[
-    {
-      'id': 'gratuito_1',
-      'titulo': 'Mensajes del Universo Fenix',
-      'descripcion': 'Descubre los mensajes que hay para ti detrás de los números, animales, símbolos y más',
-      'url': 'https://docs.google.com/document/d/1uwVoByqcPKx0opMIjcrGHeNn0srdkRMqM0zUFaTB1uk/export?format=html',
-      'localCover': 'assets/images/mensajes.png',
-    },
-    {
-      'id': 'gratuito_2',
-      'titulo': 'Astrologia basica y energia lunar Fenix',
-      'descripcion': 'Descubre la energía de la luna y fases astrológicas para usar a tu favor',
-      'url': 'https://docs.google.com/document/d/17v6dCfngpZrXbetMxq1reIx484I1YSxlxoOlzNla3Do/export?format=html',
-      'localCover': 'assets/images/energia.png',
-    },
-    {
-      'id': 'gratuito_3',
-      'titulo': 'Mensajes Emociones Fenix',
-      'descripcion': 'Descubre el mensaje detrás de tus emociones y recuerda quién eres',
-      'url': 'https://docs.google.com/document/d/1faEEBh0NAdK4ASKzOlTCGq6vQBlR4xIjNXn-GxkYD60/export?format=html',
-      'localCover': 'assets/images/emociones.png',
-    },
-  ];
-
-  /// Lista de documentos: gratuitos (siempre) + membership_content + dictionaries-membresia
+  /// Lista de documentos: dictionaries-membresia + user-purchases (sin duplicados por url).
   Widget _buildDocumentsList() {
     if (_dictionariesLoading) {
       return const Padding(
@@ -2558,14 +2533,7 @@ class _PortalScreenState extends State<PortalScreen> {
       );
     }
 
-    // 1. Gratuitos siempre presentes
     final seenUrls = <String>{};
-    final gratuitos = _diccionariosGratuitos.map((g) {
-      seenUrls.add(g['url']!);
-      return <String, dynamic>{...g};
-    }).toList();
-
-    // 2. Diccionarios de membresía (API)
     final fromMembresia = _dictionariesMembresia
         .where((d) => !seenUrls.contains((d['url'] as String? ?? '')))
         .toList();
@@ -2573,7 +2541,6 @@ class _PortalScreenState extends State<PortalScreen> {
       seenUrls.add((d['url'] as String? ?? ''));
     }
 
-    // 3. Diccionarios de ContentProvider (user-purchases / membership_content)
     final fromContent = context.read<ContentProvider>().all
         .where((item) => item.type == ContentType.diccionario)
         .map((item) => <String, dynamic>{
@@ -2587,7 +2554,7 @@ class _PortalScreenState extends State<PortalScreen> {
         .where((d) => (d['url'] as String? ?? '').isNotEmpty && !seenUrls.contains(d['url'] as String?))
         .toList();
 
-    final baseList = <Map<String, dynamic>>[...gratuitos, ...fromMembresia, ...fromContent];
+    final baseList = <Map<String, dynamic>>[...fromMembresia, ...fromContent];
     WidgetsBinding.instance.addPostFrameCallback((_) => _resolveMissingDocumentCovers(baseList));
     final searchQuery = _documentsSearchController.text.toLowerCase().trim();
     final filtered = searchQuery.isEmpty
@@ -2624,24 +2591,11 @@ class _PortalScreenState extends State<PortalScreen> {
     );
   }
 
-  /// Portada del documento: localCover (asset) → coverUrl (red) → placeholder.
+  /// Portada del documento: coverUrl (backend / resuelta) o placeholder.
   Widget _documentCover(Map<String, dynamic> document) {
     const size = 48.0;
 
-    // 1. Asset local (diccionarios gratuitos)
-    final localCover = document['localCover'] as String?;
-    if (localCover != null && localCover.isNotEmpty) {
-      return SizedBox(
-        width: size,
-        height: size,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.asset(localCover, fit: BoxFit.cover),
-        ),
-      );
-    }
-
-    // 2. URL de red (backend / resolved)
+    // URL de red (backend / resolved)
     String? coverUrl = (document['coverUrl'] as String?)?.trim();
     if (coverUrl == null || coverUrl.isEmpty || coverUrl == 'null') {
       final urlKey = (document['url'] as String?)?.toString();

@@ -1,7 +1,7 @@
 name: fenix_reader
 description: "Fénix Reader - App de meditación y contenido"
 publish_to: 'none'
-version: 1.0.8+13
+version: 1.0.9+14
 
 environment:
   sdk: ^3.10.4
@@ -34,6 +34,7 @@ dependencies:
   audioplayers: ^5.2.0
   audio_service: ^0.18.12
   just_audio: ^0.9.36
+  audio_session: ^0.1.25
   
   # Images
   cached_network_image: ^3.3.0

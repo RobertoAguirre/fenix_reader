@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:provider/provider.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'config/theme.dart';
@@ -16,9 +17,14 @@ import 'screens/home_screen.dart';
 
 const String _oneSignalAppId = 'f2561d52-ac45-4886-92fb-b18f99422515';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // Misma sesión que just_audio: playback → el audio de los videos (video_player/AVPlayer)
+  // puede seguir en segundo plano con UIBackgroundModes audio (iOS) y foco adecuado (Android).
+  final session = await AudioSession.instance;
+  await session.configure(const AudioSessionConfiguration.music());
+
   // Estilo de barra de estado
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -96,8 +102,8 @@ class _AppNavigatorState extends State<AppNavigator> {
       debugPrint('✅ Sesión válida encontrada para: $userEmail');
       
       if (userEmail != null) {
-        debugPrint('📦 Cargando contenido del usuario...');
-        context.read<ContentProvider>().loadUserContent(userEmail);
+        debugPrint('📦 Sincronizando contenido del usuario (sin caché)...');
+        context.read<ContentProvider>().syncPurchasesFromServer(userEmail);
         OneSignal.login(userEmail);
       }
       

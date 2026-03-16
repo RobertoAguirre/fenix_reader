@@ -5,7 +5,7 @@ import '../config/theme.dart';
 import '../config/constants.dart';
 import '../providers/auth_provider.dart';
 import '../providers/content_provider.dart';
-import '../services/wordpress_service.dart';
+import '../services/wordpress_service.dart' show WordPressService, ContentItem, ContentType, VimeoService;
 import '../services/favorites_service.dart';
 import '../widgets/audio_player_modal.dart';
 import '../utils/audio_helper.dart';
@@ -222,7 +222,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
               image: item.image,
               isFavorite: isFavorite,
               onTap: () async {
-                if (item.downloadUrl == null || item.downloadUrl!.isEmpty) {
+                // Misma prioridad que portal: resource_url (Vimeo formato nuevo), luego download_url
+                String? url = item.resourceUrl;
+                if (url == null || url.isEmpty) {
+                  url = item.downloadUrl;
+                }
+                if (url == null || url.isEmpty) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('No hay URL de audio disponible para ${item.title}'),
@@ -232,8 +238,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   return;
                 }
 
-                // Verificar si es una URL de audio
-                if (!AudioHelper.isAudioUrl(item.downloadUrl)) {
+                if (!AudioHelper.isAudioUrl(url) && !url.toLowerCase().contains('vimeo.com')) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('El contenido no tiene un formato de audio válido'),
@@ -243,8 +249,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   return;
                 }
 
-                // Normalizar URL (convertir Google Drive si es necesario)
-                final audioUrl = AudioHelper.normalizeAudioUrl(item.downloadUrl);
+                if (url.toLowerCase().contains('vimeo.com')) {
+                  final idMatch = RegExp(r'vimeo\.com/(?:video/)?(\d+)').firstMatch(url) ??
+                      RegExp(r'player\.vimeo\.com/video/(\d+)').firstMatch(url);
+                  if (idMatch != null) {
+                    final directUrl = await VimeoService().getVimeoVideoUrl(idMatch.group(1)!);
+                    if (directUrl != null && directUrl.isNotEmpty) {
+                      url = directUrl;
+                    }
+                  }
+                }
+
+                if (!context.mounted) return;
+                final audioUrl = AudioHelper.normalizeAudioUrl(url);
 
                 final email = context.read<AuthProvider>().user?.email;
                 if (email != null && email.isNotEmpty) {

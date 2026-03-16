@@ -596,7 +596,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'THETAFÉNIX',
+                  'CLASE FÉNIX',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
@@ -706,7 +706,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 if (messages.isNotEmpty) const SizedBox(height: 16),
                 Text(
-                  'THETAFÉNIX',
+                  'CLASE FÉNIX',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,

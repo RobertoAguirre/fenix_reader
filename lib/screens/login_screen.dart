@@ -270,8 +270,8 @@ class _LoginScreenState extends State<LoginScreen> {
           debugPrint('⚠️ onLoginSuccess es NULL - no se puede navegar');
         }
         
-        // Cargar contenido en background después de navegar
-        context.read<ContentProvider>().loadUserContent(email).catchError((error) {
+        // Sincronizar compras sin caché tras login (contenido al instante como en backend)
+        context.read<ContentProvider>().syncPurchasesFromServer(email).catchError((error) {
           debugPrint('⚠️ Error cargando contenido después del login: $error');
           // No bloquear la navegación si falla la carga de contenido
         });
@@ -319,7 +319,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Center(
         child: Text(
-          AppConstants.welcomeTitle,
+          '¡Bienvenidx!',
           style: AppTypography.kaushanTitle(
             fontSize: 32,
             color: AppColors.expansionAlquimica,

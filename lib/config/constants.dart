@@ -21,7 +21,7 @@ class AppConstants {
   static const String myLibrary = 'Calendario y mensajes';
   static const String myAccount = 'Mi espacio Fénix';
   static const String termsConditions = 'Términos y condiciones';
-  static const String contactUs = 'Contáctanos';
+  static const String contactUs = 'Soporte';
   
   // Tabs
   static const String library = 'Biblioteca';
@@ -31,7 +31,7 @@ class AppConstants {
   static const String hypnosisFenix = 'HIPNOSIS FÉNIX';
   static const String meditationsFenix = 'MEDITACIONES';
   static const String programasFenix = 'PROGRAMAS';
-  static const String thetaFenix = 'THETAFÉNIX';
+  static const String thetaFenix = 'CLASE FÉNIX';
   static const String consultaExpres = 'CONSULTA EXPRÉS';
   static const String sesionFenix = 'SESIÓN FÉNIX';
   static const String sesionFenixNinos = 'SESIÓN FÉNIX NIÑOS';
