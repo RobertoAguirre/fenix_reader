@@ -988,12 +988,35 @@ class WordPressService {
     }
   }
 
-  /// Obtener mensajes diarios (push-log). GET fenix/v1/push-log?from=YYYY-MM-DD&to=YYYY-MM-DD
+  /// Obtiene highest_tier desde user-purchases para segmentar push-log.
+  Future<String?> getHighestTier(String email) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/user-purchases?email=${Uri.encodeComponent(email)}'),
+        headers: _defaultHeaders,
+      ).timeout(normalTimeout);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return null;
+      final tier = body['highest_tier']?.toString().trim().toLowerCase();
+      if (tier == null || tier.isEmpty) return null;
+      return tier;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Obtener mensajes diarios (push-log). GET fenix/v1/push-log?from=YYYY-MM-DD&to=YYYY-MM-DD[&membership=tier]
   /// Backend devuelve: title, message, sent_day, sent_at, segment (array o objeto con lista dentro).
-  Future<List<DailyMessage>> getPushLog(DateTime from, DateTime to) async {
+  Future<List<DailyMessage>> getPushLog(DateTime from, DateTime to, {String? membership}) async {
     final fromStr = '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
     final toStr = '${to.year}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
-    final uri = Uri.parse('$baseUrl/push-log?from=$fromStr&to=$toStr');
+    final query = <String>['from=$fromStr', 'to=$toStr'];
+    final normalizedMembership = membership?.trim().toLowerCase();
+    if (normalizedMembership != null && normalizedMembership.isNotEmpty) {
+      query.add('membership=${Uri.encodeComponent(normalizedMembership)}');
+    }
+    final uri = Uri.parse('$baseUrl/push-log?${query.join('&')}');
     try {
       final response = await http.get(uri, headers: _defaultHeaders).timeout(normalTimeout);
       if (response.statusCode != 200) {

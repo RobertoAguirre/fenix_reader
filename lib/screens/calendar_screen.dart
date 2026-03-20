@@ -46,13 +46,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     setState(() { _loading = true; });
     final from = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
     final to = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
-    final list = await _wpService.getPushLog(from, to);
+    final email = mounted ? context.read<AuthProvider>().user?.email : null;
+    String? highestTier;
+    if (email != null && email.isNotEmpty) {
+      highestTier = await _wpService.getHighestTier(email);
+    }
+    final list = await _wpService.getPushLog(from, to, membership: highestTier);
     final map = <DateTime, List<DailyMessage>>{};
     for (final m in list) {
       (map[m.date] ??= []).add(m);
     }
     Map<String, Map<String, dynamic>> activity = {};
-    final email = mounted ? context.read<AuthProvider>().user?.email : null;
     if (email != null && email.isNotEmpty) {
       activity = await _wpService.getActivityCalendar(email, from: from, to: to);
     }
@@ -387,7 +391,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
             date: dateKey,
             message: entry.message!,
             monthName: _monthName(dateKey.month),
-            onTap: () => _showMessagesForDay(context, dateKey, messages, thetaSession),
+            onTap: () => _showMessagesForDay(
+              context,
+              dateKey,
+              [entry.message!],
+              null,
+            ),
           );
         }
         final eventTitle = entry.event?['title']?.toString() ?? '';
@@ -395,7 +404,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
           date: dateKey,
           monthName: _monthName(dateKey.month),
           title: eventTitle,
-          onTap: () => _showMessagesForDay(context, dateKey, messages, thetaSession),
+          onTap: () => _showMessagesForDay(
+            context,
+            dateKey,
+            const [],
+            entry.event,
+          ),
         );
       },
     );
@@ -493,7 +507,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'CLASE FÉNIX',
+                            'EN VIVO',
                             style: AppTypography.ralewayBold(
                               fontSize: 16,
                               color: AppColors.raizSagrada,
@@ -596,7 +610,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'CLASE FÉNIX',
+                  'EN VIVO',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
@@ -651,17 +665,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final moonPhaseLabel = _moonPhaseLabelFor(dateKey);
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.origen,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+        child: FractionallySizedBox(
+          heightFactor: 0.85,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               Text(
                 '${dateKey.day} ${_monthName(dateKey.month)} ${dateKey.year}',
                 style: AppTypography.ralewayBold(
@@ -706,7 +722,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
               if (thetaSession != null) ...[
                 if (messages.isNotEmpty) const SizedBox(height: 16),
                 Text(
-                  'CLASE FÉNIX',
+                  'EN VIVO',
                   style: AppTypography.ralewayBold(
                     fontSize: 16,
                     color: AppColors.raizSagrada,
@@ -721,7 +737,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
               ],
-            ],
+              ],
+            ),
           ),
         ),
       ),

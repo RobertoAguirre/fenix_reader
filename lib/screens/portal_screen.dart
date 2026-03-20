@@ -251,7 +251,7 @@ class _PortalScreenState extends State<PortalScreen> {
                   ? firstName[0].toUpperCase() + firstName.substring(1)
                   : firstName;
               return Text(
-                'Hola, $capitalizedName',
+                'Hola $capitalizedName!',
                 style: AppTypography.kaushanTitle(
                   fontSize: 28,
                   color: AppColors.expansionAlquimica,
