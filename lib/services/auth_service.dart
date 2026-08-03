@@ -15,7 +15,9 @@ class AuthService {
   static const String _userKey = 'user_data';
   static const String _deviceIdKey = 'device_id';
 
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true, resetOnError: true),
+  );
   
   User? _currentUser;
   String? _token;

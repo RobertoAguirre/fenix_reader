@@ -5,7 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Servicio para gestionar favoritos persistentes
 class FavoritesService {
   static const String _favoritesKey = 'fenix_favorites';
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true, resetOnError: true),
+  );
 
   /// Obtener lista de IDs de favoritos
   Future<List<int>> getFavorites() async {

@@ -99,7 +99,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
         onTap: () => FocusScope.of(context).unfocus(),
         behavior: HitTestBehavior.opaque,
         child: SafeArea(
-          child: SingleChildScrollView(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              SingleChildScrollView(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom + 24,
           ),
@@ -272,9 +275,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
             const SizedBox(height: 24),
           ],
         ),
+              ),
+              if (_loading)
+                Positioned.fill(
+                  child: AbsorbPointer(
+                    child: Container(
+                      color: AppColors.origen.withValues(alpha: 0.45),
+                      alignment: Alignment.center,
+                      child: CircularProgressIndicator(
+                        color: AppColors.ascenso,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -476,15 +493,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (!context.mounted) return;
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.origen,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: FractionallySizedBox(
+          heightFactor: 0.85,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
@@ -507,7 +526,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'EN VIVO',
+                            'CLASE',
                             style: AppTypography.ralewayBold(
                               fontSize: 16,
                               color: AppColors.raizSagrada,
@@ -626,6 +645,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ],
             ],
+            ),
           ),
         ),
       ),
